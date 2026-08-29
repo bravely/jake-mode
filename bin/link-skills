@@ -1,0 +1,142 @@
+#!/usr/bin/env bash
+#
+# Flatten this repository's skills into a harness skills directory, one
+# symlink per skill.
+#
+# Harnesses scan only the top level of their skills directory, so a skill
+# nested in a category folder is invisible to them. This script bridges that:
+# the repo organizes skills however it likes, and the links flatten them at
+# the boundary.
+#
+# Safe to re-run. It only ever touches entries it owns.
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SKILLS_DIR="$REPO_ROOT/skills"
+TARGET="${JAKE_MODE_TARGET:-$HOME/.claude/skills}"
+DRY_RUN=0
+PRUNE=0
+FORCE=0
+
+usage() {
+  cat <<'USAGE'
+Usage: bin/link-skills [options]
+
+Link every skill in skills/ into a harness skills directory.
+
+Options:
+  -t, --target DIR   Harness skills directory (default: ~/.claude/skills,
+                     override with $JAKE_MODE_TARGET)
+  -n, --dry-run      Print what would change, touch nothing
+      --prune        Remove links into this repo whose skill no longer exists
+  -f, --force        Replace a conflicting entry that this repo does not own
+  -h, --help         Show this message
+
+Exit status is 1 if any skill could not be linked.
+USAGE
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -t|--target)  TARGET="${2:?--target needs a directory}"; shift 2 ;;
+    -n|--dry-run) DRY_RUN=1; shift ;;
+    --prune)      PRUNE=1; shift ;;
+    -f|--force)   FORCE=1; shift ;;
+    -h|--help)    usage; exit 0 ;;
+    *) printf 'link-skills: unknown option: %s\n\n' "$1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+[ -d "$SKILLS_DIR" ] || { echo "link-skills: no skills/ directory at $SKILLS_DIR" >&2; exit 1; }
+
+# Absolute path a symlink points at. Links this script writes are always
+# absolute, which is what the prune and ownership checks rely on.
+link_target() {
+  local raw; raw="$(readlink "$1")"
+  case "$raw" in
+    /*) printf '%s\n' "$raw" ;;
+    *)  printf '%s/%s\n' "$(cd "$(dirname "$1")" && pwd)" "$raw" ;;
+  esac
+}
+
+say() { [ "$DRY_RUN" -eq 1 ] && printf 'would %s\n' "$*" || printf '%s\n' "$*"; }
+
+# A skill is any directory holding a SKILL.md.
+skill_dirs=()
+while IFS= read -r manifest; do
+  skill_dirs+=("$(cd "$(dirname "$manifest")" && pwd)")
+done < <(find "$SKILLS_DIR" -type f -name SKILL.md | sort)
+
+if [ "${#skill_dirs[@]}" -eq 0 ]; then
+  echo "link-skills: no skills found under $SKILLS_DIR" >&2
+  exit 1
+fi
+
+# Two skills with the same directory name would collide at the flat boundary.
+dupes="$(for d in "${skill_dirs[@]}"; do basename "$d"; done | sort | uniq -d)"
+if [ -n "$dupes" ]; then
+  echo "link-skills: duplicate skill names, these collide when flattened:" >&2
+  printf '%s\n' "$dupes" | sed 's/^/  /' >&2
+  exit 1
+fi
+
+if [ ! -d "$TARGET" ]; then
+  say "create $TARGET"
+  [ "$DRY_RUN" -eq 1 ] || mkdir -p "$TARGET"
+fi
+
+linked=0 current=0 failed=0
+
+for src in "${skill_dirs[@]}"; do
+  name="$(basename "$src")"
+  dest="$TARGET/$name"
+
+  if [ -L "$dest" ]; then
+    if [ "$(link_target "$dest")" = "$src" ]; then
+      current=$((current + 1))
+      continue
+    fi
+    if [ "$FORCE" -eq 0 ]; then
+      printf 'conflict: %s is a link to %s, not ours (use --force)\n' "$dest" "$(link_target "$dest")" >&2
+      failed=$((failed + 1))
+      continue
+    fi
+    say "replace link $name"
+    [ "$DRY_RUN" -eq 1 ] || rm "$dest"
+  elif [ -e "$dest" ]; then
+    if [ "$FORCE" -eq 0 ]; then
+      printf 'conflict: %s already exists and is not a symlink (use --force)\n' "$dest" >&2
+      failed=$((failed + 1))
+      continue
+    fi
+    say "replace directory $name"
+    [ "$DRY_RUN" -eq 1 ] || rm -rf "$dest"
+  fi
+
+  say "link $name -> $src"
+  [ "$DRY_RUN" -eq 1 ] || ln -s "$src" "$dest"
+  linked=$((linked + 1))
+done
+
+pruned=0
+if [ "$PRUNE" -eq 1 ]; then
+  for dest in "$TARGET"/*; do
+    [ -L "$dest" ] || continue
+    resolved="$(link_target "$dest")"
+    case "$resolved" in
+      "$SKILLS_DIR"/*) ;;
+      *) continue ;;
+    esac
+    [ -f "$resolved/SKILL.md" ] && continue
+    say "prune $(basename "$dest") (was $resolved)"
+    [ "$DRY_RUN" -eq 1 ] || rm "$dest"
+    pruned=$((pruned + 1))
+  done
+fi
+
+printf '\n%s: %d linked, %d already current, %d pruned, %d failed  (target %s)\n' \
+  "$([ "$DRY_RUN" -eq 1 ] && echo 'dry run' || echo 'done')" \
+  "$linked" "$current" "$pruned" "$failed" "$TARGET"
+
+[ "$failed" -eq 0 ]
