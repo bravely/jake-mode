@@ -61,7 +61,9 @@ Where does careful attention actually pay? Name the places that want a second op
 
 Then collect what the diff doesn't show: constraints from outside the repo, approaches ruled out, checks run out-of-band and their results.
 
-Completion: the honest list, carrying the change's weakest point — plus, when the work isn't yours, a plain statement of which claims you read rather than reproduced. A hot-spot section with nothing uncomfortable in it isn't doing its job.
+Each hot spot attaches to the stop that contains it, so the reviewer meets the warning while the file is open rather than after the tour. A hot spot with no single home (a property that only holds across files) goes in a short **Also look hard at** list after the tour.
+
+Completion: the honest list, carrying the change's weakest point — plus, when the work isn't yours, a plain statement of which claims you read rather than reproduced. A guide with nothing uncomfortable in it isn't doing its job.
 
 ## 5. Write it into the PR body
 
@@ -74,16 +76,18 @@ The guide is fenced by sentinel markers so refreshes are a section swap:
 **The point:** …
 
 **Read in this order:**
+
 1. `path/to/file.ex` — what this stop answers
+   - **Look hard at** `some_function`: why it deserves a second opinion
 2. …
 
-**Look hard at:** …
+**Also look hard at:** …
 
 **What the diff doesn't show:** …
 <!-- /review-guide -->
 ```
 
-Include the last section only when it has content.
+Include the last two sections only when they have content.
 
 For a PR that doesn't exist yet, include the fenced section in the body you pass to `gh pr create --body-file`. For one that does:
 
