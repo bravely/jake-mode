@@ -31,16 +31,10 @@ When label and decoration disagree (e.g. `issue: (non-blocking)`), the decoratio
 
 A `question:` (or any interrogative comment) is ambiguous — resolve it in this order.
 
-**Before any of the steps below: answer the question first.** A question is not a license to
-refactor. Investigate — for "do we need X / what else uses this / shouldn't it handle Z",
-literally enumerate the call sites and state what you found. The answer is usually the whole
-insight, and it's sitting in the code already ("after the refactor, only `Issue.eligible?`
-and the GitHub adapter touch these" *was* the fix). Only after you've answered do you decide
-whether a change follows. And keep the smallest change in view: when a reviewer questions
-whether something should *exist*, "what would deleting/inlining this look like?" ranks equal
-with "where should I move it?" — adding a module or abstraction in response to a doubt is a
-smell. If you're reaching for *more* structure to answer a "do we need this?", you've likely
-missed the point.
+**Answer first** (the skill's core discipline). The answer is usually the whole insight, and
+it is sitting in the code already: "after the refactor, only `Issue.eligible?` and the GitHub
+adapter touch these" *was* the fix. Only once you have answered do you decide whether a
+change follows, and the smallest change (deleting, inlining) ranks equal with any move.
 
 1. **Clarity vs. issue.** Is the reviewer asking to understand something, or using a
    question to point out a problem ("is this null-safe?" usually means "this isn't null-safe")?
