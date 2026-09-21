@@ -36,7 +36,8 @@ real from one (dry runs are fine).
 bin/link-skills --dry-run
 ```
 
-Read what it plans to do, then run it for real:
+Run it for real once the dry run lists only links and adoptions you expect,
+with no `conflict:`, `worktree:` or `dangling:` line:
 
 ```bash
 bin/link-skills
@@ -57,12 +58,7 @@ bin/link-rules
 It links every `.md` under `rules/` into `~/.claude/rules/`, which Claude Code
 loads into every session, following symlinks. One link per file rather than
 linking the directory itself, so machine-local rules this repository knows
-nothing about can sit alongside ours. These are the always-on
-instructions that used to live in `~/.claude/CLAUDE.md`; splitting them into
-files is organization, not a token saving, because every rule without a
-`paths:` front matter enters context at launch regardless. One caveat: Cowork
-sessions skip symlinked rules that point outside the working directory, so
-they run without these.
+nothing about can sit alongside ours.
 
 Point either script at a different harness with `--target`:
 
@@ -81,12 +77,12 @@ bin/link-skills --prune
 bin/link-rules --prune
 ```
 
-## When a skill does not show up
+## When a skill or rule does not show up
 
 Work through these in order.
 
-1. **The link is missing or stale.** Run `bin/link-skills --dry-run` and see
-   whether it reports the skill as already current.
+1. **The link is missing or stale.** Run the script with `--dry-run` and see
+   whether it reports the entry as already current.
 
 2. **Something else owns the name.** The script refuses to clobber an entry it
    did not create and says why: `conflict:` (another tool's link or file
@@ -104,7 +100,12 @@ Work through these in order.
    Edits to an existing `SKILL.md` are picked up inside a running session. But
    creating a **top-level skills directory that did not exist when the session
    started** is not watched until the harness restarts. If you just created the
-   target directory, restart before you debug anything else.
+   target directory, restart before you debug anything else. Rules load at
+   session start, full stop: a new or edited rule needs a fresh session.
+
+5. **It is a Cowork session.** Cowork skips symlinked rules that point outside
+   the working directory, by design. The rules from this library are absent
+   there and nothing in the wiring can change that.
 
 ## Adding to the library
 
