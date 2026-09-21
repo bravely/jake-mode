@@ -19,3 +19,11 @@ worktree dies with it.
 
 The wiring contract is `skills/meta/wire-skills/SKILL.md`; read it before
 changing `bin/`.
+
+## Anything worth remembering goes in the repo
+
+This repository *is* the record of how sessions should behave, so a lesson,
+convention or preference learned here lands in `CLAUDE.md`, `rules/` or a
+skill, where it is versioned and visible to everyone who clones it. A memory
+file lives on one machine and explains nothing to the next reader, so a
+session in this repo writes one only when Jake asks for it by name.
