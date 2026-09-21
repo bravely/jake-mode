@@ -89,11 +89,12 @@ Work through these in order.
    whether it reports the skill as already current.
 
 2. **Something else owns the name.** The script refuses to clobber an entry it
-   did not create and prints the conflict. Another tool may have installed a
-   skill under the same name, or a link points at another checkout of this
-   repository (`readlink` it; a worktree path means it was wired from the
-   wrong place). Rename yours, or pass `--force` if you are sure you want the
-   library's version to win.
+   did not create and says why: `conflict:` (another tool's link or file
+   under the same name), `worktree:` (a link into a git worktree, wired from
+   the wrong checkout; it dies when that worktree is removed), or
+   `dangling:` (the target is already gone). For the last two, `--force` from
+   the main checkout is the repair. For a real conflict, rename yours, or
+   pass `--force` if you are sure you want the library's version to win.
 
 3. **The front matter is malformed.** A skill without valid YAML front matter
    carrying `name` and `description` never registers. The `name` must match

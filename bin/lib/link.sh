@@ -78,19 +78,26 @@ link_entries() {
     [ "$DRY_RUN" -eq 1 ] || mkdir -p "$TARGET"
   fi
 
-  local linked=0 current=0 failed=0 src name dest
+  local linked=0 current=0 failed=0 src name dest resolved problem
 
   for src in "${entries[@]}"; do
     name="$(basename "$src")"
     dest="$TARGET/$name"
 
     if [ -L "$dest" ]; then
-      if [ "$(link_target "$dest")" = "$src" ]; then
+      resolved="$(link_target "$dest")"
+      if [ ! -e "$resolved" ]; then
+        problem="dangling: $dest points at $resolved, which no longer exists"
+      elif into_worktree "$resolved"; then
+        problem="worktree: $dest links into a git worktree ($resolved) and dies with it; relink from the main checkout"
+      elif [ "$resolved" = "$src" ]; then
         current=$((current + 1))
         continue
+      else
+        problem="conflict: $dest is a link to $resolved, not ours"
       fi
       if [ "$FORCE" -eq 0 ]; then
-        printf 'conflict: %s is a link to %s, not ours (use --force)\n' "$dest" "$(link_target "$dest")" >&2
+        printf '%s (use --force)\n' "$problem" >&2
         failed=$((failed + 1))
         continue
       fi
@@ -114,7 +121,7 @@ link_entries() {
     linked=$((linked + 1))
   done
 
-  local pruned=0 resolved
+  local pruned=0
   if [ "$PRUNE" -eq 1 ]; then
     for dest in "$TARGET"/*; do
       [ -L "$dest" ] || continue
@@ -139,9 +146,19 @@ link_entries() {
 
 # Is this checkout a git worktree? Links into a worktree die with it, so the
 # real run belongs in the main checkout.
-in_worktree() {
-  local common; common="$(git -C "$REPO_ROOT" rev-parse --git-common-dir 2>/dev/null)" || return 1
-  [ "$(git -C "$REPO_ROOT" rev-parse --git-dir)" != "$common" ]
+in_worktree() { into_worktree "$REPO_ROOT"; }
+
+# Does this path live inside a git worktree (of any repository)? In a main
+# checkout --git-dir and --git-common-dir are the same directory; in a
+# worktree they differ. Both are forced absolute, since from a subdirectory
+# git prints one relative and the other not.
+into_worktree() {
+  local dir="$1" git_dir common
+  [ -d "$dir" ] || dir="$(dirname "$dir")"
+  { read -r git_dir && read -r common; } < <(
+    git -C "$dir" rev-parse --path-format=absolute --git-dir --git-common-dir 2>/dev/null
+  ) || return 1
+  [ -n "$common" ] && [ "$git_dir" != "$common" ]
 }
 
 say() { [ "$DRY_RUN" -eq 1 ] && printf 'would %s\n' "$*" || printf '%s\n' "$*"; }
