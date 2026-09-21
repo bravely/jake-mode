@@ -1,5 +1,10 @@
 # jake-mode
 
+A portable library of agent skills and global rules, wired into whatever
+harness is in front of Jake. `README.md` has the layout, the categories and
+the attribution rules for ported skills; read it before adding or moving a
+skill.
+
 `bin/link-skills` and `bin/link-rules` write symlinks into `~/.claude/` that
 every Claude Code session on this machine follows. Sessions in this repo
 usually run in a worktree under `.claude/worktrees/`, and a link into a
