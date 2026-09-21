@@ -55,7 +55,9 @@ bin/link-rules
 ```
 
 It links every `.md` under `rules/` into `~/.claude/rules/`, which Claude Code
-loads into every session, following symlinks. These are the always-on
+loads into every session, following symlinks. One link per file rather than
+linking the directory itself, so machine-local rules this repository knows
+nothing about can sit alongside ours. These are the always-on
 instructions that used to live in `~/.claude/CLAUDE.md`; splitting them into
 files is organization, not a token saving, because every rule without a
 `paths:` front matter enters context at launch regardless. One caveat: Cowork
