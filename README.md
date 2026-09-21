@@ -3,10 +3,11 @@
 A portable library of agent skills, kept in its own repository and wired into
 whatever coding agent is in front of me.
 
-The skills here are ported from [`cursor/plugins`](https://github.com/cursor/plugins),
+Most skills here are ported from [`cursor/plugins`](https://github.com/cursor/plugins),
 which is MIT licensed. They were the valuable part of a week-long Cursor trial.
 The editor was not. The point of this repository is to keep the former without
-depending on the latter.
+depending on the latter. The rest are my own, kept here so they travel with
+the ported ones.
 
 ## How it works
 
@@ -22,9 +23,17 @@ That flattens `skills/<category>/<skill-name>/` into `~/.claude/skills/<skill-na
 a symlink the harness follows. The repository organizes skills however it
 likes, and the links flatten them at the boundary.
 
-Run `bin/link-skills --help` for the other options, or read
+Global rules, the always-on instructions Claude Code loads from
+`~/.claude/rules/`, live in `rules/` and are linked the same way:
+
+```bash
+bin/link-rules
+```
+
+Run either script with `--help` for the other options, or read
 [`skills/meta/wire-skills/SKILL.md`](skills/meta/wire-skills/SKILL.md) for the
-reasoning and the troubleshooting order.
+reasoning and the troubleshooting order. Run them from the main checkout, not
+a worktree; they refuse otherwise, since links into a worktree die with it.
 
 ## Why not just live in `~/.claude/skills`
 
@@ -44,9 +53,10 @@ not own.
 | `skills/principles/` | The shared vocabulary of reasoning that other skills cite |
 | `skills/planning/` | The multi-phase plan skeleton and its playbooks |
 | `skills/verification/` | Proving a claim, driving a real app, generating per-project verify skills |
-| `skills/delivery/` | Stacked execution |
+| `skills/delivery/` | Stacked execution, and the pull-request lifecycle (review guides, addressing review) |
 | `skills/hygiene/` | Cleanup passes |
 | `skills/meta/` | Skills about this library itself |
+| `rules/` | Global rules, one concern per file |
 | `bin/` | Wiring |
 | `licenses/` | Upstream license texts |
 
