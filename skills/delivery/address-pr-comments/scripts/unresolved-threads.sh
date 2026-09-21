@@ -13,6 +13,8 @@
 #   awaiting_reviewer  true if the PR author already replied last — i.e. the thread
 #                      is addressed and waiting on the reviewer to resolve, NOT on you.
 #                      Skip these unless there's a new reviewer ask. (unresolved != unaddressed)
+#                      Unreliable when the author reviews their own PR: every comment
+#                      is then "by the author", so the flag is true for fresh asks too.
 #   comments           [{author, url, body}, ...] in order
 #
 # Reply to a thread with:
