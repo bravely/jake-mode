@@ -3,7 +3,9 @@
 # Flatten one kind of repository entry into a harness directory, one symlink
 # per entry, touching only entries this repository owns.
 #
-# The calling script sets, before calling link_entries:
+# The calling script sets these before calling any function here. The
+# first five are read by parse_args and usage as well as link_entries; the
+# last two only by link_entries.
 #   PROG        its own name, for messages
 #   WHAT        plural noun for usage text ("skills")
 #   SOURCE_DIR  repository directory the entries live under
@@ -15,8 +17,10 @@
 
 set -euo pipefail
 
-# The checkout this file lives in. Every link points somewhere under it,
-# which is why a worktree checkout must not run for real.
+# The checkout this file lives in, found from this file's own path (so the
+# working directory and the calling script play no part). Every link points
+# under it: skills/ for link-skills, rules/ for link-rules. That is why a
+# worktree checkout must not run for real.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 # Command-line switches. parse_args sets them; link_entries and say read
@@ -67,9 +71,10 @@ USAGE
 # For each entry, the destination TARGET/<basename> ends up as a link to it,
 # unless the destination is owned by something else, in which case it is
 # left alone and reported (see the conflict, worktree and dangling messages).
-# --force overrides that. With --prune, links into SOURCE_DIR whose entry
-# entry_live no longer accepts are removed. Every action is printed through
-# say, so --dry-run shows the full plan.
+# --force overrides that. With --prune, a link into SOURCE_DIR is removed
+# when its target is no longer an entry (the skill or rule was renamed or
+# deleted; entry_live decides). Every action is printed through say, so
+# --dry-run shows the full plan.
 #
 # Exits 1 before touching anything when entries is empty, two entries share
 # a basename, or this is a real run from a worktree. Otherwise prints a
