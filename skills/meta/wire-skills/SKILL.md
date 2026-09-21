@@ -29,59 +29,55 @@ committing files you do not own.
 ## Wire it
 
 From the root of the **main checkout**, never a worktree: a link into a
-worktree dies when the worktree is removed, so the scripts refuse to run for
+worktree dies when the worktree is removed, so the script refuses to run for
 real from one (dry runs are fine).
 
 ```bash
-bin/link-skills --dry-run
+bin/link --dry-run
 ```
 
 Run it for real once the dry run lists only links and adoptions you expect,
 with no `conflict:`, `worktree:` or `dangling:` line:
 
 ```bash
-bin/link-skills
+bin/link
 ```
 
-It links every directory under `skills/` that contains a `SKILL.md`, using the
-directory name as the skill name. Re-running is safe; it only touches entries
-it owns. A plain copy already sitting in the target with identical content is
-adopted, swapped for a link without `--force`, since nothing is lost.
+One run wires both kinds of entry. Skills: every directory under `skills/`
+that contains a `SKILL.md`, linked under the directory name into
+`~/.claude/skills/`. Rules: every `.md` under `rules/`, linked into
+`~/.claude/rules/`, which Claude Code loads into every session, following
+symlinks. One link per rule rather than linking the directory itself, so
+machine-local rules this repository knows nothing about can sit alongside
+ours.
 
-Rules go the same way, with a sibling script:
+Re-running is safe; it only touches entries it owns, and it checks every kind
+before it touches either. A plain copy already sitting in a target with
+identical content is adopted, swapped for a link without `--force`, since
+nothing is lost.
+
+Point a kind at a different harness with its target flag:
 
 ```bash
-bin/link-rules --dry-run
-bin/link-rules
+bin/link --skills-target ~/.config/some-other-agent/skills --skip rules
 ```
 
-It links every `.md` under `rules/` into `~/.claude/rules/`, which Claude Code
-loads into every session, following symlinks. One link per file rather than
-linking the directory itself, so machine-local rules this repository knows
-nothing about can sit alongside ours.
-
-Point either script at a different harness with `--target`:
-
-```bash
-bin/link-skills --target ~/.config/some-other-agent/skills
-```
-
-Set `JAKE_MODE_TARGET` (skills) or `JAKE_MODE_RULES_TARGET` (rules) instead
-when a machine's default target is never the `~/.claude` one, so you do not
-have to pass `--target` on every run.
+`--skip` leaves a kind alone entirely, for a harness that has no notion of
+it. Set `JAKE_MODE_SKILLS_TARGET` or `JAKE_MODE_RULES_TARGET` instead when a
+machine's default target is never the `~/.claude` one, so you do not have to
+pass the flag on every run.
 
 After renaming or removing a skill or rule, clear the stale link:
 
 ```bash
-bin/link-skills --prune
-bin/link-rules --prune
+bin/link --prune
 ```
 
 ## When a skill or rule does not show up
 
 Work through these in order.
 
-1. **The link is missing or stale.** Run the script with `--dry-run` and see
+1. **The link is missing or stale.** Run `bin/link --dry-run` and see
    whether it reports the entry as already current.
 
 2. **Something else owns the name.** The script refuses to clobber an entry it
@@ -110,10 +106,10 @@ Work through these in order.
 ## Adding to the library
 
 A skill: create `skills/<category>/<skill-name>/SKILL.md`, then run
-`bin/link-skills`. Categories are for humans reading the repository; they
+`bin/link`. Categories are for humans reading the repository; they
 disappear at the boundary, so skill names must be unique across the whole
 library. The script fails loudly if two collide rather than silently linking
 one of them.
 
-A rule: create `rules/<name>.md`, then run `bin/link-rules`. Keep each rule to
+A rule: create `rules/<name>.md`, then run `bin/link`. Keep each rule to
 one concern so it can be dropped or overridden on its own.

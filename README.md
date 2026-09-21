@@ -13,27 +13,23 @@ the ported ones.
 
 Skills live under `skills/`, grouped into categories. A harness scans only the
 top level of its own skills directory, so the library reaches a harness by
-symlink, one link per skill:
+symlink, one link per skill. Global rules, the always-on instructions Claude
+Code loads from `~/.claude/rules/`, live in `rules/` and reach it the same
+way, one link per file. One command makes both sets of links:
 
 ```bash
-bin/link-skills
+bin/link
 ```
 
-That flattens `skills/<category>/<skill-name>/` into `~/.claude/skills/<skill-name>`,
-a symlink the harness follows. The repository organizes skills however it
-likes, and the links flatten them at the boundary.
+That flattens `skills/<category>/<skill-name>/` into `~/.claude/skills/<skill-name>`
+and links `rules/<name>.md` into `~/.claude/rules/<name>.md`. The repository
+organizes its entries however it likes, and the links flatten them at the
+boundary.
 
-Global rules, the always-on instructions Claude Code loads from
-`~/.claude/rules/`, live in `rules/` and are linked the same way:
-
-```bash
-bin/link-rules
-```
-
-Run either script with `--help` for the other options, or read
+Run it with `--help` for the other options, or read
 [`skills/meta/wire-skills/SKILL.md`](skills/meta/wire-skills/SKILL.md) for the
-reasoning and the troubleshooting order. Run them from the main checkout, not
-a worktree; they refuse otherwise, since links into a worktree die with it.
+reasoning and the troubleshooting order. Run it from the main checkout, not a
+worktree; it refuses otherwise, since links into a worktree die with it.
 
 ## Why not just live in `~/.claude/skills`
 
