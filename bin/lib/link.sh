@@ -26,6 +26,9 @@ DRY_RUN=0   # --dry-run: print every action as "would ...", touch nothing
 PRUNE=0     # --prune: also remove our own links whose entry no longer exists
 FORCE=0     # --force: replace entries this repo does not own
 
+# Read the command-line options into TARGET, DRY_RUN, PRUNE and FORCE.
+# Takes the caller's "$@". Exits 0 after printing --help, 2 on an unknown
+# option; anything else returns normally with the globals updated.
 parse_args() {
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -39,6 +42,8 @@ parse_args() {
   done
 }
 
+# Print the help text for the calling script, built from PROG, WHAT,
+# SOURCE_DIR, TARGET and ENV_VAR so the two scripts share one template.
 usage() {
   cat <<USAGE
 Usage: bin/$PROG [options]
@@ -57,6 +62,18 @@ Exit status is 1 if any entry could not be linked.
 USAGE
 }
 
+# The main loop: make TARGET hold one link per element of entries.
+#
+# For each entry, the destination TARGET/<basename> ends up as a link to it,
+# unless the destination is owned by something else, in which case it is
+# left alone and reported (see the conflict, worktree and dangling messages).
+# --force overrides that. With --prune, links into SOURCE_DIR whose entry
+# entry_live no longer accepts are removed. Every action is printed through
+# say, so --dry-run shows the full plan.
+#
+# Exits 1 before touching anything when entries is empty, two entries share
+# a basename, or this is a real run from a worktree. Otherwise prints a
+# summary line and returns 0 only if nothing failed.
 link_entries() {
   if [ "${#entries[@]}" -eq 0 ]; then
     echo "$PROG: no $WHAT found under $SOURCE_DIR" >&2
@@ -150,14 +167,16 @@ link_entries() {
   [ "$failed" -eq 0 ]
 }
 
-# Is this checkout a git worktree? Links into a worktree die with it, so the
-# real run belongs in the main checkout.
+# Is this checkout a git worktree? Returns 0 if so. Links into a worktree
+# die with it, so link_entries refuses a real run when this is true.
 in_worktree() { into_worktree "$REPO_ROOT"; }
 
-# Does this path live inside a git worktree (of any repository)? In a main
-# checkout --git-dir and --git-common-dir are the same directory; in a
-# worktree they differ. Both are forced absolute, since from a subdirectory
-# git prints one relative and the other not.
+# Does the given path live inside a git worktree, of any repository?
+# Returns 0 if so, 1 for a main checkout or a path outside any repository.
+# A file's directory is what gets asked. The test: in a main checkout
+# --git-dir and --git-common-dir are the same directory; in a worktree they
+# differ. Both are forced absolute, since from a subdirectory git prints
+# one relative and the other not.
 into_worktree() {
   local dir="$1" git_dir common
   [ -d "$dir" ] || dir="$(dirname "$dir")"
@@ -167,10 +186,13 @@ into_worktree() {
   [ -n "$common" ] && [ "$git_dir" != "$common" ]
 }
 
+# Report an action, prefixed with "would" under --dry-run. Every change
+# link_entries makes goes through here first, so the dry run is the plan.
 say() { [ "$DRY_RUN" -eq 1 ] && printf 'would %s\n' "$*" || printf '%s\n' "$*"; }
 
-# Absolute path a symlink points at. Links this script writes are always
-# absolute, which is what the prune and ownership checks rely on.
+# Print the absolute path the given symlink points at, resolving a relative
+# target against the link's own directory. Links this library writes are
+# always absolute, which is what the ownership and prune checks compare on.
 link_target() {
   local raw; raw="$(readlink "$1")"
   case "$raw" in
@@ -179,8 +201,10 @@ link_target() {
   esac
 }
 
-# A plain file or directory in the target whose content already matches
-# ours can be swapped for a link without --force: nothing is lost.
+# Are the two given paths a pair of files, or a pair of directories, with
+# identical content? Returns 0 if so, 1 otherwise (including a file paired
+# with a directory). A plain copy in the target that matches ours can be
+# swapped for a link without --force, since nothing is lost.
 same_content() {
   if [ -d "$1" ] && [ -d "$2" ]; then diff -rq "$1" "$2" >/dev/null 2>&1
   elif [ -f "$1" ] && [ -f "$2" ]; then cmp -s "$1" "$2"
