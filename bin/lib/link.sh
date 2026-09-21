@@ -15,10 +15,16 @@
 
 set -euo pipefail
 
+# The checkout this file lives in. Every link points somewhere under it,
+# which is why a worktree checkout must not run for real.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-DRY_RUN=0
-PRUNE=0
-FORCE=0
+
+# Command-line switches. parse_args sets them; link_entries and say read
+# them. All off by default: a bare run links what is missing and stops at
+# anything it does not own.
+DRY_RUN=0   # --dry-run: print every action as "would ...", touch nothing
+PRUNE=0     # --prune: also remove our own links whose entry no longer exists
+FORCE=0     # --force: replace entries this repo does not own
 
 parse_args() {
   while [ $# -gt 0 ]; do
