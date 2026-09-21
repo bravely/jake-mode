@@ -78,7 +78,9 @@ The guide is fenced by sentinel markers so refreshes are a section swap:
 **Read in this order:**
 
 1. `path/to/file.ex` — what this stop answers
-   - **Look hard at** `some_function`: why it deserves a second opinion
+   - **Look hard at:**
+     - `some_function`, and why it deserves a second opinion
+     - …
 2. …
 
 **Also look hard at:** …
