@@ -20,6 +20,19 @@ DRY_RUN=0
 PRUNE=0
 FORCE=0
 
+parse_args() {
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      -t|--target)  TARGET="${2:?--target needs a directory}"; shift 2 ;;
+      -n|--dry-run) DRY_RUN=1; shift ;;
+      --prune)      PRUNE=1; shift ;;
+      -f|--force)   FORCE=1; shift ;;
+      -h|--help)    usage; exit 0 ;;
+      *) printf '%s: unknown option: %s\n\n' "$PROG" "$1" >&2; usage >&2; exit 2 ;;
+    esac
+  done
+}
+
 usage() {
   cat <<USAGE
 Usage: bin/$PROG [options]
@@ -37,47 +50,6 @@ Options:
 Exit status is 1 if any entry could not be linked.
 USAGE
 }
-
-parse_args() {
-  while [ $# -gt 0 ]; do
-    case "$1" in
-      -t|--target)  TARGET="${2:?--target needs a directory}"; shift 2 ;;
-      -n|--dry-run) DRY_RUN=1; shift ;;
-      --prune)      PRUNE=1; shift ;;
-      -f|--force)   FORCE=1; shift ;;
-      -h|--help)    usage; exit 0 ;;
-      *) printf '%s: unknown option: %s\n\n' "$PROG" "$1" >&2; usage >&2; exit 2 ;;
-    esac
-  done
-}
-
-# Absolute path a symlink points at. Links this script writes are always
-# absolute, which is what the prune and ownership checks rely on.
-link_target() {
-  local raw; raw="$(readlink "$1")"
-  case "$raw" in
-    /*) printf '%s\n' "$raw" ;;
-    *)  printf '%s/%s\n' "$(cd "$(dirname "$1")" && pwd)" "$raw" ;;
-  esac
-}
-
-# Is this checkout a git worktree? Links into a worktree die with it, so the
-# real run belongs in the main checkout.
-in_worktree() {
-  local common; common="$(git -C "$REPO_ROOT" rev-parse --git-common-dir 2>/dev/null)" || return 1
-  [ "$(git -C "$REPO_ROOT" rev-parse --git-dir)" != "$common" ]
-}
-
-# A plain file or directory in the target whose content already matches
-# ours can be swapped for a link without --force: nothing is lost.
-same_content() {
-  if [ -d "$1" ] && [ -d "$2" ]; then diff -rq "$1" "$2" >/dev/null 2>&1
-  elif [ -f "$1" ] && [ -f "$2" ]; then cmp -s "$1" "$2"
-  else return 1
-  fi
-}
-
-say() { [ "$DRY_RUN" -eq 1 ] && printf 'would %s\n' "$*" || printf '%s\n' "$*"; }
 
 link_entries() {
   if [ "${#entries[@]}" -eq 0 ]; then
@@ -163,4 +135,32 @@ link_entries() {
     "$linked" "$current" "$pruned" "$failed" "$TARGET"
 
   [ "$failed" -eq 0 ]
+}
+
+# Is this checkout a git worktree? Links into a worktree die with it, so the
+# real run belongs in the main checkout.
+in_worktree() {
+  local common; common="$(git -C "$REPO_ROOT" rev-parse --git-common-dir 2>/dev/null)" || return 1
+  [ "$(git -C "$REPO_ROOT" rev-parse --git-dir)" != "$common" ]
+}
+
+say() { [ "$DRY_RUN" -eq 1 ] && printf 'would %s\n' "$*" || printf '%s\n' "$*"; }
+
+# Absolute path a symlink points at. Links this script writes are always
+# absolute, which is what the prune and ownership checks rely on.
+link_target() {
+  local raw; raw="$(readlink "$1")"
+  case "$raw" in
+    /*) printf '%s\n' "$raw" ;;
+    *)  printf '%s/%s\n' "$(cd "$(dirname "$1")" && pwd)" "$raw" ;;
+  esac
+}
+
+# A plain file or directory in the target whose content already matches
+# ours can be swapped for a link without --force: nothing is lost.
+same_content() {
+  if [ -d "$1" ] && [ -d "$2" ]; then diff -rq "$1" "$2" >/dev/null 2>&1
+  elif [ -f "$1" ] && [ -f "$2" ]; then cmp -s "$1" "$2"
+  else return 1
+  fi
 }
