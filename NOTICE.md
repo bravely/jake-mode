@@ -22,11 +22,12 @@ provenance is recorded here and in the skill's own front matter.
 | `skills/verification/control-cli/` | `cursor-team-kit/skills/control-cli/` |
 | `skills/verification/create-verification-skill/` | `pstack/skills/create-verification-skill/` |
 | `skills/verification/maintain-verification-skill/` | `pstack/skills/maintain-verification-skill/` |
-| `skills/delivery/` | `pstack/skills/poteto-mode/playbooks/` (stacking playbooks) |
+| `skills/delivery/` (stacking skills) | `pstack/skills/poteto-mode/playbooks/` |
 | `skills/hygiene/deslop/` | `cursor-team-kit/skills/deslop/` |
 
 The table describes the intended destination of each port. Rows land as their
 phases complete; see the port tracking issue.
 
-Original content in this repository, including `bin/link-skills` and
-`skills/meta/`, is licensed under [`LICENSE`](LICENSE).
+Original content in this repository, including `bin/`, `rules/`,
+`skills/meta/`, `skills/delivery/address-pr-comments/` and
+`skills/delivery/pr-review-guide/`, is licensed under [`LICENSE`](LICENSE).
