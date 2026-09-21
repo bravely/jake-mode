@@ -203,7 +203,9 @@ link_target() {
 
 # Are the two given paths a pair of files, or a pair of directories, with
 # identical content? Returns 0 if so, 1 otherwise (including a file paired
-# with a directory). A plain copy in the target that matches ours can be
+# with a directory). Content only: permissions and executable bits are not
+# compared, and symlinks inside a directory are followed rather than
+# compared as links. A plain copy in the target that matches ours can be
 # swapped for a link without --force, since nothing is lost.
 same_content() {
   if [ -d "$1" ] && [ -d "$2" ]; then diff -rq "$1" "$2" >/dev/null 2>&1
