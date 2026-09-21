@@ -19,8 +19,9 @@ worktree dies with it.
   criterion that needs `~/.claude/` touched ("resolves in a fresh session",
   "ends up all symlinks") is scoped post-merge too, and left explicitly
   undone on the branch.
-- `readlink` entries in `~/.claude/skills/` and `~/.claude/rules/` before
-  trusting them; another session may have wired from its own worktree.
+- Before trusting an entry in `~/.claude/skills/` or `~/.claude/rules/`, run
+  `readlink` on it to see where the link points; another session may have
+  wired from its own worktree.
 
 The wiring contract is `skills/meta/wire-skills/SKILL.md`; read it before
 changing `bin/`.
