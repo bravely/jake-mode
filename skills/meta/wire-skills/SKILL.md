@@ -45,7 +45,12 @@ bin/link
 
 One run wires both kinds of entry. Skills: every directory under `skills/`
 that contains a `SKILL.md`, linked under the directory name into
-`~/.claude/skills/`. Rules: every `.md` under `rules/`, linked into
+`~/.claude/skills/`, **except** skills whose front matter sets
+`metadata.reach: all`. Those are uploaded to the Claude account, which syncs
+them into every session as `anthropic-skills:<name>`, so a link would list
+them twice. The run prints a `skip` line for each one. `--include-all` links
+them anyway, to try an edit before it is uploaded; a later plain
+`bin/link --prune` takes those links away again. Rules: every `.md` under `rules/`, linked into
 `~/.claude/rules/`, which Claude Code loads into every session, following
 symlinks. One link per rule rather than linking the directory itself, so
 machine-local rules this repository knows nothing about can sit alongside
@@ -78,7 +83,11 @@ bin/link --prune
 Work through these in order.
 
 1. **The link is missing or stale.** Run `bin/link --dry-run` and see
-   whether it reports the entry as already current.
+   whether it reports the entry as already current. A `skip` line means the
+   skill has reach `all`: it arrives through the Claude account, not a
+   link. If it is missing, either it has not been uploaded yet (the
+   README's "Reach" section has the steps) or the session is not signed in
+   with that account.
 
 2. **Something else owns the name.** The script refuses to clobber an entry it
    did not create and says why: `conflict:` (another tool's link or file
@@ -103,10 +112,18 @@ Work through these in order.
    the working directory, by design. The rules from this library are absent
    there and nothing in the wiring can change that.
 
+6. **It is a cloud session.** A cloud session wires itself through its
+   environment's setup script and `bin/cloud-setup`, not through this
+   machine's links. If `code` skills or rules are missing there, the
+   environment is missing the setup script. The README's "Cloud sessions"
+   section has the script and the checks.
+
 ## Adding to the library
 
 A skill: create `skills/<category>/<skill-name>/SKILL.md`, then run
-`bin/link`. Categories are for humans reading the repository; they
+`bin/link`. It is reach `code` unless its front matter says
+`metadata.reach: all`; see the README's "Reach" section before choosing
+`all`. Categories are for humans reading the repository; they
 disappear at the boundary, so skill names must be unique across the whole
 library. The script fails loudly if two collide rather than silently linking
 one of them.

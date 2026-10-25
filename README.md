@@ -31,6 +31,74 @@ Run it with `--help` for the other options, or read
 reasoning and the troubleshooting order. Run it from the main checkout, not a
 worktree; it refuses otherwise, since links into a worktree die with it.
 
+## Reach: where a skill can be used
+
+Every skill says where it can be used through `metadata.reach` in its front
+matter:
+
+```yaml
+---
+name: some-skill
+description: ...
+metadata:
+  reach: all          # or code, the default when absent
+  experimental: true  # optional: still being tried out
+---
+```
+
+- **`code`** skills are for Claude Code only. `bin/link` wires them on a Mac,
+  and `bin/cloud-setup` wires them in cloud sessions.
+- **`all`** skills are uploaded by hand to my Claude account, which delivers
+  them to chat, mobile and every Claude Code session, local or cloud.
+  `bin/link` deliberately does **not** link them, because the account sync
+  already puts them in every session and a link would list them twice.
+  `bin/link --include-all` links them anyway, so an edit can be tried locally
+  before it is uploaded.
+
+Custom marks go under `metadata` because claude.ai rejects an upload whose
+front matter has any other key it does not know. The only top-level keys an
+`all` skill may use are `name`, `description`, `license`, `compatibility`,
+`metadata` and `allowed-tools`.
+
+claude.ai has no upload API, so the upload is by hand, and CI keeps it from
+being forgotten. The `account-upload` check runs on every pull request. When
+the pull request changes an `all` skill, the run summary lists what to upload
+or delete at claude.ai (Customize > Skills), and the run's `account-upload`
+artifact holds the zips. The check fails until the pull request has the
+`account-synced` label. Add the label once the account matches, or add it to
+skip syncing on purpose. A later push that changes an `all` skill again
+removes the label. To build the zips locally, run `bin/account-upload`; add
+`--base main` to get only what a branch changed.
+
+## Cloud sessions
+
+A Claude Code cloud session (claude.ai/code) runs in a fresh VM that never
+sees this machine's `~/.claude`. `all` skills reach it through the account.
+`code` skills and the rules reach it through each cloud environment's
+**setup script**, which clones this repository and runs `bin/cloud-setup`.
+That script wires everything into the VM's `~/.claude` the way `bin/link`
+does here. It also installs a SessionStart hook that pulls and wires again
+at the start of every session, because the setup script's result is cached
+for up to about a week.
+
+Every environment needs this as its setup script (the environment's
+settings in claude.ai/code):
+
+```bash
+[ -d ~/dev/jake-mode ] || git clone --depth 1 https://github.com/bravely/jake-mode.git ~/dev/jake-mode
+~/dev/jake-mode/bin/cloud-setup
+```
+
+To check an environment, start a session in it, then:
+
+1. `/skills` lists the `code` skills, such as `wire-skills`.
+2. `/context` lists the rules under Memory files, as `/root/.claude/rules/...`.
+3. `cat ~/.claude/settings.json` shows the SessionStart hook running
+   `bin/cloud-setup --refresh`.
+
+An environment without the setup script still gets the `all` skills, but no
+rules and no `code` skills.
+
 ## Why not just live in `~/.claude/skills`
 
 Two reasons.
@@ -53,7 +121,8 @@ not own.
 | `skills/hygiene/` | Cleanup passes |
 | `skills/meta/` | Skills about this library itself |
 | `rules/` | Global rules, one concern per file |
-| `bin/` | Wiring |
+| `bin/` | Wiring (`link`, `cloud-setup`) and the account upload (`account-upload`) |
+| `.github/workflows/` | The `account-upload` check |
 | `licenses/` | Upstream license texts |
 
 Categories are for humans reading the repository. They disappear at the symlink

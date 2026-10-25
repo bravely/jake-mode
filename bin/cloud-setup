@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+#
+# Wire this library into a Claude Code cloud session (claude.ai/code).
+#
+# A cloud session runs in a fresh VM that never sees the ~/.claude of the
+# machine I work on, so the links bin/link makes there do not follow me.
+# What does load is whatever sits in the VM's own ~/.claude: skills in
+# ~/.claude/skills and rules in ~/.claude/rules both load, checked by
+# experiment. So each cloud environment's setup script clones this
+# repository and runs this script, which runs bin/link inside the VM. It
+# is the same wiring as on a Mac, and it leaves out reach `all` skills for
+# the same reason: those reach the session through the Claude account.
+#
+# The setup script's filesystem is cached and reused for up to about a
+# week, so on its own the clone would go stale. This script therefore also
+# installs a SessionStart hook in the VM's ~/.claude/settings.json that
+# runs `bin/cloud-setup --refresh` at the start of every session: pull,
+# then wire again. Skills it brings in load within that session. Rules
+# load before the hook runs, so a rule change shows up from the next
+# session on.
+#
+# The bootstrap that goes in each environment's setup script, and the
+# checklist for adding it, are in README.md under "Cloud sessions".
+
+set -euo pipefail
+
+PROG=cloud-setup
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SETTINGS="$HOME/.claude/settings.json"
+HOOK_COMMAND="$REPO_ROOT/bin/cloud-setup --refresh"
+
+main() {
+  case "${1:-}" in
+    --refresh)
+      # The hook's stdout would be added to the session's context, so the
+      # refresh stays quiet unless something fails.
+      git -C "$REPO_ROOT" pull -q --ff-only
+      # Run the version just pulled, not the one bash already has open.
+      exec "$REPO_ROOT/bin/cloud-setup" --wire-only > /dev/null
+      ;;
+    --wire-only) wire ;;
+    "") wire; install_hook ;;
+    -h|--help)
+      printf 'Usage: bin/%s [--refresh]\n\nWire skills and rules into this VM'"'"'s ~/.claude and install the\nSessionStart hook that refreshes them. --refresh pulls first and skips\nthe hook install (the hook itself runs it).\n' "$PROG"
+      ;;
+    *) printf '%s: unknown option: %s\n' "$PROG" "$1" >&2; exit 2 ;;
+  esac
+}
+
+wire() { "$REPO_ROOT/bin/link" --prune; }
+
+# Add the refresh hook to ~/.claude/settings.json, keeping anything else
+# already in it. Running this twice leaves one hook, not two.
+install_hook() {
+  mkdir -p "$(dirname "$SETTINGS")"
+  python3 - "$SETTINGS" "$HOOK_COMMAND" <<'PY'
+import json, os, sys
+path, command = sys.argv[1], sys.argv[2]
+settings = {}
+if os.path.exists(path):
+    with open(path) as f:
+        settings = json.load(f)
+groups = settings.setdefault("hooks", {}).setdefault("SessionStart", [])
+if not any(h.get("command") == command for g in groups for h in g.get("hooks", [])):
+    groups.append({"matcher": "startup", "hooks": [{"type": "command", "command": command}]})
+with open(path, "w") as f:
+    json.dump(settings, f, indent=2)
+    f.write("\n")
+PY
+  printf 'SessionStart hook in %s runs: %s\n' "$SETTINGS" "$HOOK_COMMAND"
+}
+
+main "$@"

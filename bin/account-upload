@@ -1,0 +1,216 @@
+#!/usr/bin/env bash
+#
+# Prepare skills with reach `all` for the Claude account: check their front
+# matter, work out which ones a change touches, and zip those for upload.
+#
+# Why by hand: a skill reaches chat, mobile and Claude Code cloud sessions
+# only by being uploaded to the claude.ai account, and claude.ai has no
+# upload API. (The Skills API writes to a separate API-workspace store
+# that neither claude.ai nor Claude Code reads.) So this script does
+# everything short of the upload, and .github/workflows/account-upload.yml
+# runs it on every pull request so the upload cannot be forgotten.
+#
+# With --base REF it reports only the skills that changed since REF:
+#   upload <name>  reach is `all` now and the skill changed, or it just
+#                  became `all`. Its zip is written to the output directory.
+#   delete <name>  reach was `all` at REF and the skill is now gone or
+#                  `code`. Remove it from the account by hand.
+# Without --base, every reach `all` skill is an upload, which is how to
+# build the whole set for a fresh account.
+#
+# Every skill is checked either way. The script exits 1 if any check
+# fails, so a skill that claude.ai would reject never reaches the upload.
+
+set -euo pipefail
+
+PROG=account-upload
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# shellcheck source-path=SCRIPTDIR source=lib/skill-meta.sh
+. "$REPO_ROOT/bin/lib/skill-meta.sh"
+
+BASE=""
+OUT="$REPO_ROOT/account-upload"
+
+usage() {
+  cat <<USAGE
+Usage: bin/$PROG [--base REF] [--out DIR]
+
+Check every skill's front matter and zip the reach \`all\` skills for upload
+to the Claude account (Customize > Skills > Upload a skill).
+
+  --base REF  Only the skills changed since REF (compared from the merge
+              base, as a pull request diff is), including ones to delete
+  --out DIR   Where the zips and the actions list go
+              (default: account-upload/ in the repository; it is emptied)
+
+Prints a Markdown summary. DIR/actions lists one "upload <name>" or
+"delete <name>" per line. Exit status 1 if any skill fails its checks.
+USAGE
+}
+
+main() {
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --base) BASE="${2:?--base needs a ref}"; shift 2 ;;
+      --out)  OUT="${2:?--out needs a directory}"; shift 2 ;;
+      -h|--help) usage; exit 0 ;;
+      *) printf '%s: unknown option: %s\n\n' "$PROG" "$1" >&2; usage >&2; exit 2 ;;
+    esac
+  done
+
+  rm -rf "$OUT"
+  mkdir -p "$OUT"
+  : > "$OUT/actions"
+
+  local problems="$OUT/problems" dir
+  : > "$problems"
+  while IFS= read -r dir; do
+    check_skill "$dir" >> "$problems"
+  done < <(head_skill_dirs)
+
+  if [ -n "$BASE" ]; then
+    plan_changed
+  else
+    while IFS= read -r dir; do
+      [ "$(skill_reach "$REPO_ROOT/$dir")" = all ] && printf 'upload %s %s\n' "$(basename "$dir")" "$dir"
+    done < <(head_skill_dirs) > "$OUT/plan"
+  fi
+
+  local action name path
+  while read -r action name path; do
+    printf '%s %s\n' "$action" "$name" >> "$OUT/actions"
+    if [ "$action" = upload ] && [ ! -s "$problems" ]; then
+      (cd "$REPO_ROOT/$(dirname "$path")" && zip -qr "$OUT/$name.zip" "$name" -x '*.DS_Store')
+    fi
+  done < "$OUT/plan"
+  rm "$OUT/plan"
+
+  summary "$problems"
+  if [ -s "$problems" ]; then
+    rm "$problems"
+    exit 1
+  fi
+  rm "$problems"
+}
+
+# Every skill directory in the working tree, relative to the repository
+# root, sorted.
+head_skill_dirs() {
+  (cd "$REPO_ROOT" && find skills -type f -name SKILL.md -exec dirname {} \; | sort)
+}
+
+# Write the plan for --base to $OUT/plan: one "<action> <name> <dir>" line
+# per skill that changed since the merge base and is or was reach `all`.
+# A skill that moved category shows up as gone from one directory and new
+# in another; when the same name is uploaded, its delete is dropped.
+plan_changed() {
+  local mb dir before_reach after_reach tmp
+  mb="$(git -C "$REPO_ROOT" merge-base "$BASE" HEAD)"
+  tmp="$(mktemp)"
+
+  {
+    head_skill_dirs
+    git -C "$REPO_ROOT" ls-tree -r --name-only "$mb" -- skills | sed -n 's|/SKILL\.md$||p'
+  } | sort -u | while IFS= read -r dir; do
+    if git -C "$REPO_ROOT" diff --quiet "$mb" -- "$dir"; then
+      continue
+    fi
+    if git -C "$REPO_ROOT" cat-file -e "$mb:$dir/SKILL.md" 2>/dev/null; then
+      git -C "$REPO_ROOT" show "$mb:$dir/SKILL.md" > "$tmp"
+      before_reach="$(skill_file_reach "$tmp")"
+    else
+      before_reach=none
+    fi
+    if [ -f "$REPO_ROOT/$dir/SKILL.md" ]; then
+      after_reach="$(skill_reach "$REPO_ROOT/$dir")"
+    else
+      after_reach=none
+    fi
+
+    if [ "$after_reach" = all ]; then
+      printf 'upload %s %s\n' "$(basename "$dir")" "$dir"
+    elif [ "$before_reach" = all ]; then
+      printf 'delete %s %s\n' "$(basename "$dir")" "$dir"
+    fi
+  done > "$OUT/plan.raw"
+  rm -f "$tmp"
+
+  awk '$1 == "upload" { up[$2] = 1 } { line[NR] = $0; act[NR] = $1; nm[NR] = $2 }
+       END { for (i = 1; i <= NR; i++) if (!(act[i] == "delete" && up[nm[i]])) print line[i] }' \
+    "$OUT/plan.raw" > "$OUT/plan"
+  rm "$OUT/plan.raw"
+}
+
+# Print one line per problem with the given skill directory (relative to
+# the repository root), nothing when it is fine. Every skill needs a valid
+# reach and a block-style metadata map; reach `all` skills must also pass
+# what claude.ai checks on upload. Reach `code` skills may use any key
+# Claude Code understands, since they are never uploaded.
+check_skill() {
+  local dir="$1" file="$REPO_ROOT/$1/SKILL.md" fm reach name desc key
+  fm="$(skill_frontmatter "$file")"
+  if [ -z "$fm" ]; then
+    printf '%s: no front matter\n' "$dir"
+    return
+  fi
+
+  if printf '%s\n' "$fm" | grep -qE '^metadata:[[:space:]]*[^[:space:]#]'; then
+    printf '%s: metadata must be a block map, one "key: value" per indented line\n' "$dir"
+  fi
+  reach="$(skill_reach "$REPO_ROOT/$dir")"
+  case "$reach" in
+    all|code) ;;
+    *) printf '%s: metadata.reach is "%s"; it must be all or code\n' "$dir" "$reach" ;;
+  esac
+
+  name="$(printf '%s\n' "$fm" | sed -n 's/^name:[[:space:]]*//p' | head -1 | sed 's/^["'\'']//; s/["'\'']$//')"
+  if [ "$name" != "$(basename "$dir")" ]; then
+    printf '%s: name "%s" does not match the directory name\n' "$dir" "$name"
+  fi
+
+  [ "$reach" = all ] || return 0
+
+  while IFS= read -r key; do
+    case " $ACCOUNT_FRONTMATTER_KEYS " in
+      *" $key "*) ;;
+      *) printf '%s: claude.ai rejects the front matter key "%s" (allowed: %s)\n' \
+           "$dir" "$key" "$ACCOUNT_FRONTMATTER_KEYS" ;;
+    esac
+  done < <(printf '%s\n' "$fm" | sed -n 's/^\([A-Za-z0-9_-]*\):.*/\1/p')
+
+  if ! printf '%s' "$name" | grep -qE '^[a-z0-9-]{1,64}$'; then
+    printf '%s: name must be 1-64 lowercase letters, digits and hyphens\n' "$dir"
+  fi
+  desc="$(printf '%s\n' "$fm" | sed -n 's/^description:[[:space:]]*//p' | head -1 | sed 's/^["'\'']//; s/["'\'']$//')"
+  if [ -z "$desc" ]; then
+    printf '%s: no description\n' "$dir"
+  elif [ "${#desc}" -gt 1024 ]; then
+    printf '%s: description is %d characters; claude.ai allows 1024\n' "$dir" "${#desc}"
+  fi
+}
+
+# Print the Markdown summary for the given problems file.
+summary() {
+  local problems="$1" action name
+  if [ -s "$problems" ]; then
+    printf '### Skills that claude.ai would reject\n\n'
+    sed 's/^/- /' "$problems"
+    printf '\nNo zips were built. Fix these first.\n'
+    return
+  fi
+  if [ ! -s "$OUT/actions" ]; then
+    printf 'No skill with reach `all` changed, so the Claude account needs nothing.\n'
+    return
+  fi
+  printf '### Claude account changes\n\n'
+  printf 'At claude.ai, Customize > Skills:\n\n'
+  while read -r action name; do
+    case "$action" in
+      upload) printf -- '- **Upload** `%s.zip` (replace the existing `%s` if there is one)\n' "$name" "$name" ;;
+      delete) printf -- '- **Delete** `%s`\n' "$name" ;;
+    esac
+  done < "$OUT/actions"
+}
+
+main "$@"

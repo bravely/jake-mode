@@ -10,6 +10,18 @@
 # organizes its entries however it likes, and the links flatten them at
 # the boundary.
 #
+# Skills with reach `all` are deliberately NOT linked. Each skill says
+# where it can be used through `metadata.reach` in its front matter (see
+# bin/lib/skill-meta.sh). A reach `all` skill is uploaded by hand to the
+# Claude account, and Claude Code syncs account skills into every session
+# on its own, as anthropic-skills:<name>. Linking it here as well would
+# list it twice in every session, so this script leaves it to the sync.
+# The cost: an edit to an `all` skill is not live locally until it is
+# uploaded. To try an edit before then, link it on purpose with
+# --include-all and accept the duplicate until the next plain --prune run
+# removes it. Why the upload is by hand and how it is gated:
+# .github/workflows/account-upload.yml.
+#
 # Safe to re-run. Nothing is touched until every kind has passed its
 # checks, and a failure in one kind does not stop the other.
 
@@ -22,6 +34,9 @@ PROG=link
 # for skills, rules/ for rules. That is why a worktree checkout must not
 # run for real.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# shellcheck source-path=SCRIPTDIR source=lib/skill-meta.sh
+. "$REPO_ROOT/bin/lib/skill-meta.sh"
 
 # The kinds of entry, in the order they are linked. --skip validates
 # against this list, and every per-kind function below is named after it.
@@ -39,9 +54,10 @@ DRY_RUN=0   # --dry-run: print every action as "would ...", touch nothing
 PRUNE=0     # --prune: also remove our own links whose entry no longer exists
 FORCE=0     # --force: replace entries this repo does not own
 SKIP=()     # --skip: kinds to leave alone entirely
+INCLUDE_ALL=0  # --include-all: link reach `all` skills too (see the top)
 
 # Totals across every kind, for the summary line and the exit status.
-LINKED=0 CURRENT=0 PRUNED=0 FAILED=0
+LINKED=0 CURRENT=0 SKIPPED=0 PRUNED=0 FAILED=0
 
 # The entries of the kind most recently passed to collect, as absolute
 # source paths. Filled once per kind for the checks and again for the
@@ -77,9 +93,9 @@ main() {
     link_kind "$kind"
   done
 
-  printf '\n%s: %d linked, %d already current, %d pruned, %d failed\n' \
+  printf '\n%s: %d linked, %d already current, %d left to account sync, %d pruned, %d failed\n' \
     "$([ "$DRY_RUN" -eq 1 ] && echo 'dry run' || echo 'done')" \
-    "$LINKED" "$CURRENT" "$PRUNED" "$FAILED"
+    "$LINKED" "$CURRENT" "$SKIPPED" "$PRUNED" "$FAILED"
 
   [ "$FAILED" -eq 0 ]
 }
@@ -98,6 +114,7 @@ parse_args() {
       -n|--dry-run) DRY_RUN=1; shift ;;
       --prune)      PRUNE=1; shift ;;
       -f|--force)   FORCE=1; shift ;;
+      --include-all) INCLUDE_ALL=1; shift ;;
       -h|--help)    usage; exit 0 ;;
       *) usage_error "unknown option: $1" ;;
     esac
@@ -113,7 +130,8 @@ Usage: bin/$PROG [options]
 Link every skill under skills/ and every rule under rules/ into a harness,
 one symlink per entry. Kinds, and where they go on this machine:
 
-  skills   every directory holding a SKILL.md, flattened under its own name
+  skills   every directory holding a SKILL.md, flattened under its own name,
+           except skills with reach \`all\` (Claude account sync delivers those)
            -> ${SKILLS_TARGET/#$HOME/~}  (\$JAKE_MODE_SKILLS_TARGET)
   rules    every .md file
            -> ${RULES_TARGET/#$HOME/~}  (\$JAKE_MODE_RULES_TARGET)
@@ -125,7 +143,9 @@ Options:
   -n, --dry-run            Print what would change, touch nothing
       --prune              Remove links into this repo whose entry no longer exists
   -f, --force              Replace a conflicting entry that this repo does not own
-  -h, --help               Show this message
+      --include-all        Also link reach \`all\` skills, to try an edit before
+                           uploading it (they then show up twice)
+  -h, --help              Show this message
 
 Nothing is touched until every kind passes its checks. Exit status is 1 if
 any entry could not be linked, 2 for a usage error.
@@ -214,6 +234,17 @@ link_kind() {
     name="$(basename "$src")"
     dest="$target/$name"
 
+    if ! "${kind}_wanted" "$src"; then
+      SKIPPED=$((SKIPPED + 1))
+      if [ -L "$dest" ] && [ "$(link_target "$dest")" = "$src" ] && [ "$PRUNE" -eq 0 ]; then
+        printf 'skip %s (%s), but an earlier link is still there; --prune removes it\n' \
+          "$name" "$("${kind}_unwanted_reason")"
+      else
+        printf 'skip %s (%s)\n' "$name" "$("${kind}_unwanted_reason")"
+      fi
+      continue
+    fi
+
     if [ -L "$dest" ]; then
       resolved="$(link_target "$dest")"
       if [ ! -e "$resolved" ]; then
@@ -259,19 +290,22 @@ link_kind() {
       "$source"/*) ;;
       *) continue ;;
     esac
-    "${kind}_live" "$resolved" && continue
+    "${kind}_live" "$resolved" && "${kind}_wanted" "$resolved" && continue
     say "prune $(basename "$dest") (was $resolved)"
     [ "$DRY_RUN" -eq 1 ] || rm "$dest"
     PRUNED=$((PRUNED + 1))
   done
 }
 
-# Each kind is four functions: where its entries live in the repository,
-# where they go in the harness, how to list them, and whether a path is
-# still one of them (what --prune asks before removing a link). A third
-# kind is four more functions and a name in KINDS.
+# Each kind is six functions: where its entries live in the repository,
+# where they go in the harness, how to list them, whether a path is still
+# one of them, whether an entry should be linked at all, and the reason
+# printed when it is not. --prune removes a link whose target fails either
+# of the middle two. A third kind is six more functions and a name in KINDS.
 
-# skills: any directory holding a SKILL.md, however deeply nested.
+# skills: any directory holding a SKILL.md, however deeply nested. A skill
+# with reach `all` is not linked unless --include-all is given; the top of
+# this file says why.
 skills_source()  { printf '%s\n' "$REPO_ROOT/skills"; }
 skills_target()  { printf '%s\n' "$SKILLS_TARGET"; }
 skills_entries() {
@@ -281,6 +315,8 @@ skills_entries() {
   done < <(find "$REPO_ROOT/skills" -type f -name SKILL.md | sort)
 }
 skills_live()    { [ -f "$1/SKILL.md" ]; }
+skills_wanted()  { [ "$INCLUDE_ALL" -eq 1 ] || [ "$(skill_reach "$1")" != all ]; }
+skills_unwanted_reason() { printf 'reach all: Claude account sync delivers it'; }
 
 # rules: any .md file under rules/.
 rules_source()  { printf '%s\n' "$REPO_ROOT/rules"; }
@@ -292,6 +328,8 @@ rules_entries() {
   done < <(find "$REPO_ROOT/rules" -type f -name '*.md' | sort)
 }
 rules_live()    { [ -f "$1" ]; }
+rules_wanted()  { return 0; }
+rules_unwanted_reason() { :; }
 
 # Is this checkout a git worktree? Returns 0 if so. Links into a worktree
 # die with it, so main refuses a real run when this is true.
