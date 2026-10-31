@@ -77,7 +77,7 @@ setup() {
 # first. A plugin that fails to install is reported and skipped, so one bad
 # plugin never keeps the skills and rules from being wired.
 install_plugins() {
-  local settings plans kind name source failed=0
+  local settings plans kind name source installed=0 failed=0
   if ! command -v claude > /dev/null; then
     printf '%s: claude is not on PATH, so no plugins were installed\n' "$PROG" >&2
     return 0
@@ -120,14 +120,16 @@ PY
         fi
         ;;
       plugin)
-        if ! claude plugin install "$name" > /dev/null; then
+        if claude plugin install "$name" > /dev/null; then
+          installed=$((installed + 1))
+        else
           printf '%s: could not install plugin %s\n' "$PROG" "$name" >&2
           failed=$((failed + 1))
         fi
         ;;
     esac
   done <<<"$plans"
-  printf 'Plugins from %s installed, %d failed\n' "$DOTFILES_SETTINGS" "$failed"
+  printf 'Plugins from %s: %d installed, %d failed\n' "$DOTFILES_SETTINGS" "$installed" "$failed"
 }
 
 # Add the refresh hook to ~/.claude/settings.json, keeping anything else
