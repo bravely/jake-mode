@@ -1,0 +1,102 @@
+# Keep the Claude account in step with skills that have reach `all`.
+#
+# Those skills reach chat, mobile and cloud sessions only through my
+# claude.ai account, and claude.ai has no upload API, so the upload is by
+# hand. This check is a required status check on main. It makes the hand
+# upload part of merging: whenever a pull request changes a reach `all`
+# skill, it fails until the pull request carries the `claude-account-synced`
+# label. The label means either "the account matches this pull request" or
+# "I am choosing not to sync it". Either way it is a click in the sidebar.
+#
+# The run's summary lists exactly what to upload or delete, and the zips to
+# upload are attached to the run as the `claude-account-upload` artifact. A
+# push that changes a reach `all` skill again removes the label, so a
+# confirmation never outlives the version it confirmed.
+#
+# The work itself is bin/claude-account-upload, which also runs locally.
+
+name: claude-account-upload
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: claude-account-upload-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  claude-account-upload:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        # Named explicitly so the runner adds pipefail; a check failure in
+        # bin/claude-account-upload must not be hidden by the tee after it.
+        shell: bash
+    env:
+      LABEL: claude-account-synced
+      GH_TOKEN: ${{ github.token }}
+      PR: ${{ github.event.pull_request.number }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Check skills and build the upload
+        id: plan
+        run: |
+          bin/claude-account-upload --base "origin/${{ github.event.pull_request.base.ref }}" --out "$RUNNER_TEMP/claude-account-upload" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ -s "$RUNNER_TEMP/claude-account-upload/actions" ]; then
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          fi
+          if ls "$RUNNER_TEMP"/claude-account-upload/*.zip >/dev/null 2>&1; then
+            echo "zips=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Attach the zips
+        if: steps.plan.outputs.zips == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: claude-account-upload
+          path: ${{ runner.temp }}/claude-account-upload/*.zip
+
+      - name: Drop a stale confirmation
+        if: >-
+          github.event.action == 'synchronize' &&
+          contains(github.event.pull_request.labels.*.name, 'claude-account-synced')
+        id: stale
+        run: |
+          before='${{ github.event.before }}'
+          # A force push can leave the old head unreachable; treat that as
+          # a change, since there is no way to tell what the label confirmed.
+          if git cat-file -e "$before^{commit}" 2>/dev/null; then
+            bin/claude-account-upload --base "$before" --out "$RUNNER_TEMP/since-label" > /dev/null || true
+            [ -s "$RUNNER_TEMP/since-label/actions" ] || exit 0
+          fi
+          gh pr edit "$PR" --remove-label "$LABEL"
+          echo "removed=true" >> "$GITHUB_OUTPUT"
+          {
+            echo
+            echo "This push changed a reach \`all\` skill again, so the \`$LABEL\` label was removed. Upload the new version and add it back."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Require the claude-account-synced label
+        if: steps.plan.outputs.needed == 'true'
+        run: |
+          labelled='${{ contains(github.event.pull_request.labels.*.name, 'claude-account-synced') }}'
+          if [ "$labelled" = true ] && [ '${{ steps.stale.outputs.removed }}' != true ]; then
+            echo "Labelled $LABEL: the account is confirmed in step (or deliberately skipped)."
+            exit 0
+          fi
+          echo "::error::This pull request changes skills with reach \`all\`. Make the Claude account changes listed in the run summary, then add the \`$LABEL\` label (or add it to skip syncing)."
+          exit 1
