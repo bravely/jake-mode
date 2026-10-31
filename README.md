@@ -121,6 +121,7 @@ not own.
 | `skills/delivery/` | Stacked execution, and the pull-request lifecycle (review guides, addressing review) |
 | `skills/hygiene/` | Cleanup passes |
 | `skills/meta/` | Skills about this library itself |
+| `skills/productivity/` | Personal productivity: task capture in Todoist, the GTD weekly review and retro, call notes |
 | `rules/` | Global rules, one concern per file |
 | `bin/` | Wiring (`link`, `cloud-setup`) and the account upload (`claude-account-upload`) |
 | `.github/workflows/` | The `claude-account-upload` check and the tests |
