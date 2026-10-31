@@ -20,7 +20,7 @@
 # build the whole set for a fresh account.
 #
 # Every skill is checked either way. The script exits 1 if any check
-# fails, so a skill that claude.ai would reject never reaches the upload.
+# fails, so a skill that fails them never reaches the upload.
 
 set -euo pipefail
 
@@ -150,9 +150,10 @@ plan_changed() {
 
 # Print one line per problem with the given skill directory (relative to
 # the repository root), nothing when it is fine. Every skill needs front
-# matter that parses as YAML, a valid reach and a block-style metadata map; reach `all` skills must also pass
-# what claude.ai checks on upload. Reach `code` skills may use any key
-# Claude Code understands, since they are never uploaded.
+# matter that parses as YAML, a valid reach and a block-style metadata
+# map; reach `all` skills must also pass what claude.ai checks on upload.
+# Reach `code` skills may use any key Claude Code understands, since they
+# are never uploaded.
 check_skill() {
   local dir="$1" file="$REPO_ROOT/$1/SKILL.md" fm reach name desc key
   fm="$(skill_frontmatter "$file")"
@@ -205,7 +206,7 @@ check_skill() {
 summary() {
   local problems="$1" action name
   if [ -s "$problems" ]; then
-    printf '### Skills that claude.ai would reject\n\n'
+    printf '### Skills to fix before upload\n\n'
     sed 's/^/- /' "$problems"
     printf '\nNo zips were built. Fix these first.\n'
     return
