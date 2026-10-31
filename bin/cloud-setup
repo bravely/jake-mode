@@ -19,6 +19,13 @@
 # load before the hook runs, so a rule change shows up from the next
 # session on.
 #
+# Declared plugins do not follow either. A cloud session ignores the
+# enabledPlugins a repository's settings declare, and the dotfiles user
+# settings that declare mine never reach the VM. So this script also reads
+# those settings from the dotfiles repository on GitHub and installs each
+# Declared plugin, adding its marketplace first. It runs on every refresh
+# too, so a plugin newly declared in dotfiles arrives without a rebuild.
+#
 # The bootstrap that goes in each environment's setup script, and the
 # checklist for adding it, are in README.md under "Cloud sessions".
 
@@ -29,6 +36,14 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SETTINGS="$HOME/.claude/settings.json"
 HOOK_COMMAND="$REPO_ROOT/bin/cloud-setup --refresh"
 
+# The dotfiles settings that declare my plugins. A local path works too,
+# which is how to try a change before it is on dotfiles' main.
+DOTFILES_SETTINGS="${JAKE_MODE_DOTFILES_SETTINGS:-https://raw.githubusercontent.com/bravely/dotfiles/main/private_dot_claude/private_settings.json}"
+
+# Where a marketplace comes from when the settings name it without listing
+# it under extraKnownMarketplaces. Only the official one is reserved.
+OFFICIAL_MARKETPLACE=anthropics/claude-plugins-official
+
 main() {
   case "${1:-}" in
     --refresh)
@@ -38,8 +53,8 @@ main() {
       # Run the version just pulled, not the one bash already has open.
       exec "$REPO_ROOT/bin/cloud-setup" --wire-only > /dev/null
       ;;
-    --wire-only) wire ;;
-    "") wire; install_hook ;;
+    --wire-only) wire; install_plugins ;;
+    "") wire; install_plugins; install_hook ;;
     -h|--help)
       printf 'Usage: bin/%s [--refresh]\n\nWire skills and rules into this VM'"'"'s ~/.claude and install the\nSessionStart hook that refreshes them. --refresh pulls first and skips\nthe hook install (the hook itself runs it).\n' "$PROG"
       ;;
@@ -48,6 +63,63 @@ main() {
 }
 
 wire() { "$REPO_ROOT/bin/link" --prune; }
+
+# Install every plugin the dotfiles settings enable, adding its marketplace
+# first. A plugin that fails to install is reported and skipped, so one bad
+# plugin never keeps the skills and rules from being wired.
+install_plugins() {
+  local settings plans kind name source failed=0
+  if ! command -v claude > /dev/null; then
+    printf '%s: claude is not on PATH, so no plugins were installed\n' "$PROG" >&2
+    return 0
+  fi
+  if [[ -f "$DOTFILES_SETTINGS" ]]; then
+    settings="$(cat "$DOTFILES_SETTINGS")"
+  elif ! settings="$(curl -fsSL "$DOTFILES_SETTINGS")"; then
+    printf '%s: could not fetch %s, so no plugins were installed\n' "$PROG" "$DOTFILES_SETTINGS" >&2
+    return 0
+  fi
+  # One line per step: "marketplace <name> <source>" for each marketplace
+  # an enabled plugin needs, then "plugin <id>" for each enabled plugin.
+  plans="$(python3 - "$OFFICIAL_MARKETPLACE" "$settings" <<'PY'
+import json, sys
+official = sys.argv[1]
+settings = json.loads(sys.argv[2])
+known = settings.get("extraKnownMarketplaces", {})
+plugins = [p for p, on in settings.get("enabledPlugins", {}).items() if on]
+needed = sorted({p.split("@", 1)[1] for p in plugins if "@" in p})
+for name in needed:
+    src = known.get(name, {}).get("source", {})
+    source = src.get("url") or src.get("repo") or src.get("path")
+    if source is None and name == "claude-plugins-official":
+        source = official
+    if source:
+        print("marketplace", name, source)
+for p in plugins:
+    print("plugin", p)
+PY
+)"
+  while read -r kind name source; do
+    case "$kind" in
+      marketplace)
+        if claude plugin marketplace list --json | python3 -c 'import json,sys; sys.exit(0 if any(m["name"]==sys.argv[1] for m in json.load(sys.stdin)) else 1)' "$name"; then
+          continue
+        fi
+        if ! claude plugin marketplace add "$source" > /dev/null; then
+          printf '%s: could not add marketplace %s from %s\n' "$PROG" "$name" "$source" >&2
+          failed=$((failed + 1))
+        fi
+        ;;
+      plugin)
+        if ! claude plugin install "$name" > /dev/null; then
+          printf '%s: could not install plugin %s\n' "$PROG" "$name" >&2
+          failed=$((failed + 1))
+        fi
+        ;;
+    esac
+  done <<<"$plans"
+  printf 'Plugins from %s installed, %d failed\n' "$DOTFILES_SETTINGS" "$failed"
+}
 
 # Add the refresh hook to ~/.claude/settings.json, keeping anything else
 # already in it. Running this twice leaves one hook, not two.
