@@ -204,3 +204,40 @@ EOF
   run skill_reach "$SKILL_DIR"
   [ "$output" = "everywhere" ]
 }
+
+# --- skill_frontmatter_yaml_error
+
+@test "yaml: prints nothing for front matter that parses" {
+  skill <<'EOF'
+---
+name: some-skill
+description: "Works for any call: work meetings, 1:1s."
+metadata:
+  reach: all
+---
+EOF
+  run skill_frontmatter_yaml_error "$SKILL"
+  [ "$status" -eq 0 ]
+  [ "$output" = "" ]
+}
+
+@test "yaml: names the file line of an unquoted value containing a colon and space" {
+  skill <<'EOF'
+---
+name: some-skill
+description: Works for any call: work meetings.
+---
+EOF
+  run skill_frontmatter_yaml_error "$SKILL"
+  [ "$output" = "line 3 column 32: mapping values are not allowed in this context" ]
+}
+
+@test "yaml: says so when ruby is missing rather than passing" {
+  skill <<'EOF'
+---
+name: some-skill
+---
+EOF
+  PATH="$BATS_TEST_TMPDIR/empty" run skill_frontmatter_yaml_error "$SKILL"
+  [ "$output" = "ruby is not installed, so it could not be checked" ]
+}

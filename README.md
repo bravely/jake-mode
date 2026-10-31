@@ -60,6 +60,11 @@ front matter has any other key it does not know. The only top-level keys an
 `all` skill may use are `name`, `description`, `license`, `compatibility`,
 `metadata` and `allowed-tools`.
 
+Every skill's front matter must also parse as YAML. A plain value
+containing `: `, such as `description: Works for any call: work meetings`,
+is not valid YAML, so quote it. claude.ai accepts the unquoted form and
+stores it quoted, which leaves the account copy different from the file.
+
 claude.ai has no upload API, so the upload is by hand, and CI keeps it from
 being forgotten. The `claude-account-upload` check runs on every pull
 request. When the pull request changes an `all` skill, the run summary lists

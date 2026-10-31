@@ -33,6 +33,26 @@ skill_frontmatter() {
        { print }' "$1"
 }
 
+# Print why the given SKILL.md's front matter is not valid YAML, as
+# "line N column M: <problem>" with N counted in the file, or nothing when
+# it parses. The line-by-line reading in this file tolerates what a real
+# YAML parser rejects, such as an unquoted description containing ": ",
+# and claude.ai does parse it, so this is the check that catches those.
+# Needs ruby, which macOS and the GitHub Ubuntu runners both ship.
+skill_frontmatter_yaml_error() {
+  if ! command -v ruby >/dev/null; then
+    echo "ruby is not installed, so it could not be checked"
+    return
+  fi
+  skill_frontmatter "$1" | ruby -ryaml -e '
+    begin
+      YAML.parse($stdin.read)
+    rescue Psych::SyntaxError => e
+      # +1 for the opening fence, which skill_frontmatter leaves out.
+      puts "line #{e.line + 1} column #{e.column}: #{e.problem}"
+    end'
+}
+
 # Print the value of one key under the front matter's `metadata:` map, for
 # the skill directory given first and the key given second. Quotes and a
 # trailing comment are stripped. Prints nothing when the key is absent.
