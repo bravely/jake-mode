@@ -9,6 +9,11 @@ skill.
 on this machine follows. Sessions in this repo usually run in a worktree
 under `.claude/worktrees/`, and a link into a worktree dies with it.
 
+`GLOSSARY.md` defines the terms for this library's own skills, and
+`docs/adr/` records why skills and rules reach each surface the way they
+do. Use the glossary's terms, and read the ADRs before changing how
+anything is wired or synced.
+
 ## Wiring is post-merge, from the main checkout
 
 - On a branch, the only touch on `~/.claude/` is `--dry-run`. The script

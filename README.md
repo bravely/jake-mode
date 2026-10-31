@@ -125,6 +125,8 @@ not own.
 | `bin/` | Wiring (`link`, `cloud-setup`) and the account upload (`claude-account-upload`) |
 | `.github/workflows/` | The `claude-account-upload` check |
 | `licenses/` | Upstream license texts |
+| `GLOSSARY.md` | The terms this library uses for its own skills: Promoted, Experimental, Reach, Wiring |
+| `docs/adr/` | Decisions about how skills and rules reach each place Claude runs |
 
 Categories are for humans reading the repository. They disappear at the symlink
 boundary, so skill names must be unique across the whole library.
