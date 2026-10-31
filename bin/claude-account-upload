@@ -41,7 +41,8 @@ Check every skill's front matter and zip the reach \`all\` skills for upload
 to the Claude account (Customize > Skills > Upload a skill).
 
   --base REF  Only the skills changed since REF (compared from the merge
-              base, as a pull request diff is), including ones to delete
+              base, as a pull request diff is), including ones to delete;
+              uncommitted changes count too
   --out DIR   Where the zips and the actions list go
               (default: claude-account-upload/ in the repository;
               it is emptied)
@@ -104,6 +105,8 @@ head_skill_dirs() {
 
 # Write the plan for --base to $OUT/plan: one "<action> <name> <dir>" line
 # per skill that changed since the merge base and is or was reach `all`.
+# The working tree counts, untracked files included, so a local run before
+# committing sees what CI will see after.
 # A skill that moved category shows up as gone from one directory and new
 # in another; when the same name is uploaded, its delete is dropped.
 plan_changed() {
@@ -115,7 +118,8 @@ plan_changed() {
     head_skill_dirs
     git -C "$REPO_ROOT" ls-tree -r --name-only "$mb" -- skills | sed -n 's|/SKILL\.md$||p'
   } | sort -u | while IFS= read -r dir; do
-    if git -C "$REPO_ROOT" diff --quiet "$mb" -- "$dir"; then
+    if git -C "$REPO_ROOT" diff --quiet "$mb" -- "$dir" &&
+       [ -z "$(git -C "$REPO_ROOT" ls-files --others --exclude-standard -- "$dir")" ]; then
       continue
     fi
     if git -C "$REPO_ROOT" cat-file -e "$mb:$dir/SKILL.md" 2>/dev/null; then
