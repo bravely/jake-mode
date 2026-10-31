@@ -16,8 +16,9 @@ runs its `bin/cloud-setup`, which wires them into the VM's `~/.claude` the same 
 - **Uploading through the Skills API from a GitHub Action**: rejected. The docs state
   plainly that skills uploaded through the API are not available on claude.ai, and Claude
   Code only syncs skills from the claude.ai account.
-- **jake-mode as a plugin marketplace**: rejected. Cloud sessions do not install plugins,
-  whether a repo's settings declare them or they come from my own settings, and plugins
+- **jake-mode as a plugin marketplace**: rejected. Cloud sessions do not install the plugins
+  a repo's settings declare, and never see my own settings. A setup script can install
+  plugins in the VM (`bin/cloud-setup` does this for my Declared plugins), but plugins
   cannot carry rules. Attaching a custom marketplace to a personal claude.ai account is not
   documented.
 - **Automating the claude.ai upload page with a browser agent or script**: rejected. The
@@ -39,5 +40,8 @@ runs its `bin/cloud-setup`, which wires them into the VM's `~/.claude` the same 
 - A cloud environment without the setup-script bootstrap gets only the `all` skills. The
   setup script's filesystem is cached for up to about a week, so a SessionStart hook pulls
   jake-mode and wires it again at the start of each session.
+- Declared plugins reach cloud sessions through the same setup script: `bin/cloud-setup`
+  reads them from the dotfiles settings on GitHub and installs each one in the VM, on setup
+  and on every refresh. A plugin it installs loads from the next session on.
 - Per-surface control does not exist for account skills. A skill wanted in chat is in
   every surface, which is why reach defaults to `code`.

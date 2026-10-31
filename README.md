@@ -87,6 +87,14 @@ does here. It also installs a SessionStart hook that pulls and wires again
 at the start of every session, because the setup script's result is cached
 for up to about a week.
 
+Declared plugins (the plugins my
+[dotfiles](https://github.com/bravely/dotfiles) settings enable) miss cloud
+sessions too: a cloud session ignores plugins that a repo's settings
+declare, and never sees my user settings. So `bin/cloud-setup` also fetches
+those settings from dotfiles' `main`, adds each marketplace they need, and
+installs each enabled plugin. It does this on every refresh as well, so a
+plugin newly declared in dotfiles shows up from the session after next.
+
 Every environment needs this as its setup script (the environment's
 settings in claude.ai/code):
 
@@ -101,9 +109,12 @@ To check an environment, start a session in it, then:
 2. `/context` lists the rules under Memory files, as `/root/.claude/rules/...`.
 3. `cat ~/.claude/settings.json` shows the SessionStart hook running
    `bin/cloud-setup --refresh`.
+4. `claude plugin list` lists each Declared plugin, such as
+   `mattpocock-skills@claude-plugins-official`.
 
-An environment without the setup script still gets the `all` skills, but no
-rules and no `code` skills.
+An environment without the setup script still gets the `all` skills and any
+plugins synced from the Claude account, but no rules, no `code` skills and no
+Declared plugins.
 
 ## Why not just live in `~/.claude/skills`
 
