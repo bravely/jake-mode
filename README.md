@@ -55,7 +55,7 @@ metadata:
   `bin/link --include-all` links them anyway, so an edit can be tried locally
   before it is uploaded.
 
-Custom marks go under `metadata` because claude.ai rejects an upload whose
+Custom fields go under `metadata` because claude.ai rejects an upload whose
 front matter has any other key it does not know. The only top-level keys an
 `all` skill may use are `name`, `description`, `license`, `compatibility`,
 `metadata` and `allowed-tools`.

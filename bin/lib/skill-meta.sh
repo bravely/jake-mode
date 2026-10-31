@@ -1,10 +1,10 @@
 # shellcheck shell=bash
-# Read the marks a skill carries in its SKILL.md front matter. Sourced, not
-# run: bin/link and bin/account-upload both need the same answer to "what
-# is this skill's reach?", so the parsing lives here once.
+# Read the custom fields a skill carries in its SKILL.md front matter.
+# Sourced, not run: bin/link and bin/account-upload both need the same
+# answer to "what is this skill's reach?", so the parsing lives here once.
 #
-# Custom marks live under the `metadata:` map, because claude.ai rejects an
-# upload whose front matter has any other top-level key it does not know
+# Custom fields live under the `metadata:` map, because claude.ai rejects
+# an upload whose front matter has any other top-level key it does not know
 # (it accepts only name, description, license, compatibility, metadata and
 # allowed-tools). The map must be block style, one `key: value` per
 # indented line:
@@ -16,7 +16,7 @@
 # bin/account-upload rejects the inline `metadata: {...}` form, so
 # the plain line-by-line reading below never has to understand it.
 #
-# The marks:
+# The fields:
 #   reach         all  -> uploaded to the Claude account by hand, reaching chat,
 #                         mobile and every Claude Code session through it.
 #                 code -> wired by bin/link, Claude Code only. The default.
