@@ -53,8 +53,8 @@ main() {
       # Run the version just pulled, not the one bash already has open.
       exec "$REPO_ROOT/bin/cloud-setup" --wire-only > /dev/null
       ;;
-    --wire-only) wire; install_plugins ;;
-    "") wire; install_plugins; install_hook ;;
+    --wire-only) setup ;;
+    "") setup; install_hook ;;
     -h|--help)
       printf 'Usage: bin/%s [--refresh]\n\nWire skills and rules into this VM'"'"'s ~/.claude and install the\nSessionStart hook that refreshes them. --refresh pulls first and skips\nthe hook install (the hook itself runs it).\n' "$PROG"
       ;;
@@ -63,6 +63,15 @@ main() {
 }
 
 wire() { "$REPO_ROOT/bin/link" --prune; }
+
+# Wire, then install plugins even if wiring failed, so neither blocks the
+# other. The exit status is wiring's.
+setup() {
+  local status=0
+  wire || status=$?
+  install_plugins
+  return "$status"
+}
 
 # Install every plugin the dotfiles settings enable, adding its marketplace
 # first. A plugin that fails to install is reported and skipped, so one bad
