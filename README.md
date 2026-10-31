@@ -140,7 +140,8 @@ flight. Directories appear as their phases complete.
 
 Tests for the scripts in `bin/` live under `test/` and run with
 [bats](https://github.com/bats-core/bats-core). So far they cover
-`bin/lib/skill-meta.sh`. bats is expected to be installed already: my dotfiles'
+`bin/lib/skill-meta.sh` and the `--base` plan of `bin/claude-account-upload`.
+bats is expected to be installed already: my dotfiles'
 Brewfile installs it on every Mac, or run `brew install bats-core`. Then,
 from the repository root:
 
