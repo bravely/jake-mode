@@ -4,18 +4,18 @@
 # claude.ai account, and claude.ai has no upload API, so the upload is by
 # hand. This check is a required status check on main. It makes the hand
 # upload part of merging: whenever a pull request changes a reach `all`
-# skill, it fails until the pull request carries the `account-synced`
+# skill, it fails until the pull request carries the `claude-account-synced`
 # label. The label means either "the account matches this pull request" or
 # "I am choosing not to sync it". Either way it is a click in the sidebar.
 #
 # The run's summary lists exactly what to upload or delete, and the zips to
-# upload are attached to the run as the `account-upload` artifact. A push
-# that changes a reach `all` skill again removes the label, so a
+# upload are attached to the run as the `claude-account-upload` artifact. A
+# push that changes a reach `all` skill again removes the label, so a
 # confirmation never outlives the version it confirmed.
 #
-# The work itself is bin/account-upload, which also runs locally.
+# The work itself is bin/claude-account-upload, which also runs locally.
 
-name: account-upload
+name: claude-account-upload
 
 on:
   pull_request:
@@ -28,19 +28,19 @@ permissions:
   issues: write
 
 concurrency:
-  group: account-upload-${{ github.event.pull_request.number }}
+  group: claude-account-upload-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
-  account-upload:
+  claude-account-upload:
     runs-on: ubuntu-latest
     defaults:
       run:
         # Named explicitly so the runner adds pipefail; a check failure in
-        # bin/account-upload must not be hidden by the tee after it.
+        # bin/claude-account-upload must not be hidden by the tee after it.
         shell: bash
     env:
-      LABEL: account-synced
+      LABEL: claude-account-synced
       GH_TOKEN: ${{ github.token }}
       PR: ${{ github.event.pull_request.number }}
     steps:
@@ -52,14 +52,14 @@ jobs:
       - name: Check skills and build the upload
         id: plan
         run: |
-          bin/account-upload --base "origin/${{ github.event.pull_request.base.ref }}" --out "$RUNNER_TEMP/account-upload" \
+          bin/claude-account-upload --base "origin/${{ github.event.pull_request.base.ref }}" --out "$RUNNER_TEMP/claude-account-upload" \
             | tee -a "$GITHUB_STEP_SUMMARY"
-          if [ -s "$RUNNER_TEMP/account-upload/actions" ]; then
+          if [ -s "$RUNNER_TEMP/claude-account-upload/actions" ]; then
             echo "needed=true" >> "$GITHUB_OUTPUT"
           else
             echo "needed=false" >> "$GITHUB_OUTPUT"
           fi
-          if ls "$RUNNER_TEMP"/account-upload/*.zip >/dev/null 2>&1; then
+          if ls "$RUNNER_TEMP"/claude-account-upload/*.zip >/dev/null 2>&1; then
             echo "zips=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -67,20 +67,20 @@ jobs:
         if: steps.plan.outputs.zips == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: account-upload
-          path: ${{ runner.temp }}/account-upload/*.zip
+          name: claude-account-upload
+          path: ${{ runner.temp }}/claude-account-upload/*.zip
 
       - name: Drop a stale confirmation
         if: >-
           github.event.action == 'synchronize' &&
-          contains(github.event.pull_request.labels.*.name, 'account-synced')
+          contains(github.event.pull_request.labels.*.name, 'claude-account-synced')
         id: stale
         run: |
           before='${{ github.event.before }}'
           # A force push can leave the old head unreachable; treat that as
           # a change, since there is no way to tell what the label confirmed.
           if git cat-file -e "$before^{commit}" 2>/dev/null; then
-            bin/account-upload --base "$before" --out "$RUNNER_TEMP/since-label" > /dev/null || true
+            bin/claude-account-upload --base "$before" --out "$RUNNER_TEMP/since-label" > /dev/null || true
             [ -s "$RUNNER_TEMP/since-label/actions" ] || exit 0
           fi
           gh pr edit "$PR" --remove-label "$LABEL"
@@ -90,10 +90,10 @@ jobs:
             echo "This push changed a reach \`all\` skill again, so the \`$LABEL\` label was removed. Upload the new version and add it back."
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Require the account-synced label
+      - name: Require the claude-account-synced label
         if: steps.plan.outputs.needed == 'true'
         run: |
-          labelled='${{ contains(github.event.pull_request.labels.*.name, 'account-synced') }}'
+          labelled='${{ contains(github.event.pull_request.labels.*.name, 'claude-account-synced') }}'
           if [ "$labelled" = true ] && [ '${{ steps.stale.outputs.removed }}' != true ]; then
             echo "Labelled $LABEL: the account is confirmed in step (or deliberately skipped)."
             exit 0

@@ -61,14 +61,15 @@ front matter has any other key it does not know. The only top-level keys an
 `metadata` and `allowed-tools`.
 
 claude.ai has no upload API, so the upload is by hand, and CI keeps it from
-being forgotten. The `account-upload` check runs on every pull request. When
-the pull request changes an `all` skill, the run summary lists what to upload
-or delete at claude.ai (Customize > Skills), and the run's `account-upload`
-artifact holds the zips. The check fails until the pull request has the
-`account-synced` label. Add the label once the account matches, or add it to
-skip syncing on purpose. A later push that changes an `all` skill again
-removes the label. To build the zips locally, run `bin/account-upload`; add
-`--base main` to get only what a branch changed.
+being forgotten. The `claude-account-upload` check runs on every pull
+request. When the pull request changes an `all` skill, the run summary lists
+what to upload or delete at claude.ai (Customize > Skills), and the run's
+`claude-account-upload` artifact holds the zips. The check fails until the
+pull request has the `claude-account-synced` label. Add the label once the
+account matches, or add it to skip syncing on purpose. A later push that
+changes an `all` skill again removes the label. To build the zips locally,
+run `bin/claude-account-upload`; add `--base main` to get only what a branch
+changed.
 
 ## Cloud sessions
 
@@ -121,8 +122,8 @@ not own.
 | `skills/hygiene/` | Cleanup passes |
 | `skills/meta/` | Skills about this library itself |
 | `rules/` | Global rules, one concern per file |
-| `bin/` | Wiring (`link`, `cloud-setup`) and the account upload (`account-upload`) |
-| `.github/workflows/` | The `account-upload` check |
+| `bin/` | Wiring (`link`, `cloud-setup`) and the account upload (`claude-account-upload`) |
+| `.github/workflows/` | The `claude-account-upload` check |
 | `licenses/` | Upstream license texts |
 
 Categories are for humans reading the repository. They disappear at the symlink

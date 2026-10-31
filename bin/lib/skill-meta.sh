@@ -1,7 +1,8 @@
 # shellcheck shell=bash
 # Read the custom fields a skill carries in its SKILL.md front matter.
-# Sourced, not run: bin/link and bin/account-upload both need the same
-# answer to "what is this skill's reach?", so the parsing lives here once.
+# Sourced, not run: bin/link and bin/claude-account-upload both need the
+# same answer to "what is this skill's reach?", so the parsing lives here
+# once.
 #
 # Custom fields live under the `metadata:` map, because claude.ai rejects
 # an upload whose front matter has any other top-level key it does not know
@@ -13,7 +14,7 @@
 #     reach: all
 #     experimental: true
 #
-# bin/account-upload rejects the inline `metadata: {...}` form, so
+# bin/claude-account-upload rejects the inline `metadata: {...}` form, so
 # the plain line-by-line reading below never has to understand it.
 #
 # The fields:
@@ -56,8 +57,8 @@ skill_file_metadata() {
 
 # Print the reach of the given skill directory: its `metadata.reach`, or
 # `code` when it has none. An unknown value is printed as-is so that the
-# check in bin/account-upload can name it; everything else treats any value
-# but `all` as code.
+# check in bin/claude-account-upload can name it; everything else treats
+# any value but `all` as code.
 skill_reach() { skill_file_reach "$1/SKILL.md"; }
 
 # The same, given the SKILL.md file itself.
@@ -67,6 +68,6 @@ skill_file_reach() {
 }
 
 # The top-level keys claude.ai accepts in an uploaded skill's front matter.
-# Anything else fails the upload. Read by bin/account-upload.
+# Anything else fails the upload. Read by bin/claude-account-upload.
 # shellcheck disable=SC2034
 ACCOUNT_FRONTMATTER_KEYS="name description license compatibility metadata allowed-tools"

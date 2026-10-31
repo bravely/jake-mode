@@ -7,8 +7,9 @@
 # only by being uploaded to the claude.ai account, and claude.ai has no
 # upload API. (The Skills API writes to a separate API-workspace store
 # that neither claude.ai nor Claude Code reads.) So this script does
-# everything short of the upload, and .github/workflows/account-upload.yml
-# runs it on every pull request so the upload cannot be forgotten.
+# everything short of the upload, and
+# .github/workflows/claude-account-upload.yml runs it on every pull request
+# so the upload cannot be forgotten.
 #
 # With --base REF it reports only the skills that changed since REF:
 #   upload <name>  reach is `all` now and the skill changed, or it just
@@ -23,14 +24,14 @@
 
 set -euo pipefail
 
-PROG=account-upload
+PROG=claude-account-upload
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # shellcheck source-path=SCRIPTDIR source=lib/skill-meta.sh
 . "$REPO_ROOT/bin/lib/skill-meta.sh"
 
 BASE=""
-OUT="$REPO_ROOT/account-upload"
+OUT="$REPO_ROOT/claude-account-upload"
 
 usage() {
   cat <<USAGE
@@ -42,7 +43,8 @@ to the Claude account (Customize > Skills > Upload a skill).
   --base REF  Only the skills changed since REF (compared from the merge
               base, as a pull request diff is), including ones to delete
   --out DIR   Where the zips and the actions list go
-              (default: account-upload/ in the repository; it is emptied)
+              (default: claude-account-upload/ in the repository;
+              it is emptied)
 
 Prints a Markdown summary. DIR/actions lists one "upload <name>" or
 "delete <name>" per line. Exit status 1 if any skill fails its checks.

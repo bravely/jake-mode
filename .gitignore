@@ -2,5 +2,5 @@
 *.swp
 node_modules/
 
-# bin/account-upload output
-account-upload/
+# bin/claude-account-upload output
+claude-account-upload/

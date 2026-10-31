@@ -20,7 +20,7 @@
 # uploaded. To try an edit before then, link it on purpose with
 # --include-all and accept the duplicate until the next plain --prune run
 # removes it. Why the upload is by hand and how it is gated:
-# .github/workflows/account-upload.yml.
+# .github/workflows/claude-account-upload.yml.
 #
 # Safe to re-run. Nothing is touched until every kind has passed its
 # checks, and a failure in one kind does not stop the other.
