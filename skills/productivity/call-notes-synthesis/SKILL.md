@@ -1,6 +1,6 @@
 ---
 name: call-notes-synthesis
-description: Turns raw, real-time notes from a voice or video call that could not be recorded into a clean, organized note in the user's own shorthand style, actively chasing down gaps and ambiguities first so information is retained while memory is still fresh. Trigger whenever the user says anything like "synthesize my call notes", "process my notes from a call", "clean up my meeting notes", "I just got off a call, here are my notes", "turn my raw notes into a proper note", "help me write up this call", or pastes raw notes from a meeting/appointment/call and asks for help organizing them. Works for any unrecorded call: work meetings, recruiter screens, 1:1s, medical or therapy appointments, school or service calls, personal calls.
+description: "Turns raw, real-time notes from a voice or video call that could not be recorded into a clean, organized note in the user's own shorthand style, actively chasing down gaps and ambiguities first so information is retained while memory is still fresh. Trigger whenever the user says anything like \"synthesize my call notes\", \"process my notes from a call\", \"clean up my meeting notes\", \"I just got off a call, here are my notes\", \"turn my raw notes into a proper note\", \"help me write up this call\", or pastes raw notes from a meeting/appointment/call and asks for help organizing them. Works for any unrecorded call: work meetings, recruiter screens, 1:1s, medical or therapy appointments, school or service calls, personal calls."
 metadata:
   reach: all
 ---
