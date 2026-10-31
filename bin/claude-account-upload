@@ -145,8 +145,8 @@ plan_changed() {
 }
 
 # Print one line per problem with the given skill directory (relative to
-# the repository root), nothing when it is fine. Every skill needs a valid
-# reach and a block-style metadata map; reach `all` skills must also pass
+# the repository root), nothing when it is fine. Every skill needs front
+# matter that parses as YAML, a valid reach and a block-style metadata map; reach `all` skills must also pass
 # what claude.ai checks on upload. Reach `code` skills may use any key
 # Claude Code understands, since they are never uploaded.
 check_skill() {
@@ -155,6 +155,11 @@ check_skill() {
   if [ -z "$fm" ]; then
     printf '%s: no front matter\n' "$dir"
     return
+  fi
+
+  local yaml_error; yaml_error="$(skill_frontmatter_yaml_error "$file")"
+  if [ -n "$yaml_error" ]; then
+    printf '%s: front matter is not valid YAML: %s\n' "$dir" "$yaml_error"
   fi
 
   if printf '%s\n' "$fm" | grep -qE '^metadata:[[:space:]]*[^[:space:]#]'; then
