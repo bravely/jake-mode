@@ -36,17 +36,24 @@ skill_frontmatter() {
 # Print the value of one key under the front matter's `metadata:` map, for
 # the skill directory given first and the key given second. Quotes and a
 # trailing comment are stripped. Prints nothing when the key is absent.
+# Only keys at the map's own indent count, so a `reach:` inside a map
+# nested under `metadata` is not mistaken for the skill's reach.
 skill_metadata() { skill_file_metadata "$1/SKILL.md" "$2"; }
 
 # The same, given the SKILL.md file itself rather than its directory, so a
 # copy taken from another commit can be read too.
 skill_file_metadata() {
   skill_frontmatter "$1" | awk -v key="$2" '
-    /^metadata:[[:space:]]*$/ { inmeta = 1; next }
+    /^metadata:[[:space:]]*$/ { inmeta = 1; indent = ""; next }
     /^[^[:space:]#]/          { inmeta = 0; next }
-    inmeta && $0 ~ "^[[:space:]]+" key ":" {
-      v = $0
-      sub("^[[:space:]]+" key ":[[:space:]]*", "", v)
+    !inmeta || /^[[:space:]]*(#|$)/ { next }
+    {
+      match($0, /^[[:space:]]+/)
+      if (indent == "") indent = substr($0, 1, RLENGTH)
+    }
+    substr($0, 1, RLENGTH) == indent && substr($0, RLENGTH + 1, length(key) + 1) == key ":" {
+      v = substr($0, RLENGTH + length(key) + 2)
+      sub(/^[[:space:]]*/, "", v)
       sub(/[[:space:]]+#.*$/, "", v)
       sub(/[[:space:]]+$/, "", v)
       gsub(/^["\047]|["\047]$/, "", v)

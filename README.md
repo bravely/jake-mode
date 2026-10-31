@@ -123,7 +123,8 @@ not own.
 | `skills/meta/` | Skills about this library itself |
 | `rules/` | Global rules, one concern per file |
 | `bin/` | Wiring (`link`, `cloud-setup`) and the account upload (`claude-account-upload`) |
-| `.github/workflows/` | The `claude-account-upload` check |
+| `.github/workflows/` | The `claude-account-upload` check and the tests |
+| `test/` | bats tests for the scripts in `bin/` |
 | `licenses/` | Upstream license texts |
 
 Categories are for humans reading the repository. They disappear at the symlink
@@ -131,6 +132,21 @@ boundary, so skill names must be unique across the whole library.
 
 The port lands one category at a time; see the tracking issue for what is in
 flight. Directories appear as their phases complete.
+
+## Tests
+
+Tests for the scripts in `bin/` live under `test/` and run with
+[bats](https://github.com/bats-core/bats-core). So far they cover
+`bin/lib/skill-meta.sh`. bats is expected to be installed already: my dotfiles'
+Brewfile installs it on every Mac, or run `brew install bats-core`. Then,
+from the repository root:
+
+```bash
+bats test/
+```
+
+The `test` workflow runs the same thing on every pull request, on Ubuntu,
+whose awk differs from macOS's.
 
 ## Conventions
 
