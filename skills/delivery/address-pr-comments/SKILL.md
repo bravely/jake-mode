@@ -130,6 +130,9 @@ Done when the user has confirmed the push.
 
 ### 7. Reply on each thread
 
+A reply to a human reviewer is a draft until the user says yes to its exact
+text (the `code-review-replies` rule). Replies to bot reviewers go straight out.
+
 For every thread in your reply set, post a reply to its first comment's
 `reply_to` id, opening with the signature:
 
