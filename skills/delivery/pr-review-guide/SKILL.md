@@ -20,6 +20,8 @@ git diff --stat "origin/$base"...HEAD
 git diff --stat "origin/$base"...HEAD -- ':(exclude)*.lock'
 ```
 
+For a stacked PR that isn't open yet, set `base` to the parent branch it will target. The fallback picks the default branch, which counts the parent's commits as this PR's.
+
 The second count is the **significant** one. Widen the exclusion when the repo carries other generated trees — vendored dependencies, snapshot fixtures, compiled assets.
 
 Read the state fresh each run: another session or a merge can move `HEAD` and the base mid-task, and a guide written against a diff that no longer exists is worse than none.
@@ -28,7 +30,9 @@ Read the state fresh each run: another session or a merge can move `HEAD` and th
 - **Guide anyway** when a small diff crosses layers (schema + API + UI), or introduces an abstraction that other code now calls. Span beats size.
 - **Downshift** when the bulk is one mechanical operation repeated. A 40-file rename needs one sentence naming the operation and the file where real behaviour changed — not a tour.
 
-Completion: either a written decision to skip (say so in one line to the user and stop here) or a file-and-line count you read off the `--stat`. On a refresh, a guide that already exists stays even if the current diff would gate out — reviewers may already be working from it.
+Skipping the tour doesn't skip step 4. If the change has a hot spot (an external consumer of an event or API, behaviour asserted but not run), write it into the body even with no tour.
+
+Completion: either a written decision to skip (say so in one line to the user; write any hot spots, then stop) or a file-and-line count you read off the `--stat`. On a refresh, a guide that already exists stays even if the current diff would gate out — reviewers may already be working from it.
 
 ## 2. Name the thesis
 
