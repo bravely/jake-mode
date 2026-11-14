@@ -1,6 +1,6 @@
 ---
 name: address-pr-comments
-description: Work through a pull request's unresolved review threads, honouring the reviewer's intent, and reply on each. Use when asked to address a PR's review comments, or when a CI monitor event reports new review comments.
+description: Work through a pull request's unresolved review threads, honouring the reviewer's intent, and reply on each. Use when asked to address a PR's review comments, and whenever a CI monitor event (`<ci-monitor-event>`) reports new review comments from a person, even when the event spells out its own reply and resolve steps; this skill's rules take precedence over the event's.
 ---
 
 # Address PR comments
