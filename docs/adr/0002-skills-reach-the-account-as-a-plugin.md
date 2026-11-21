@@ -60,8 +60,10 @@ documented, and a throwaway test repo on 2026-11-21 showed it working end to end
   disagree, and `--write` rebuilds them.
 - No `version` is set, so every commit on `main` is a release. After a merge that changes an
   `all` skill, each account needs **Check for updates**, and the CI summary says when.
-- `plugins/jake-mode/` may hold only its manifest and the links, and it must be the only
-  plugin in the repo. CI fails otherwise.
+- `plugins/jake-mode/` may hold only its manifest and the links, a linked skill folder may
+  hold no symlink and no nested skill or plugin, and the plugin must be the only one in the
+  repo. Because claude.ai follows the links, the check looks at every folder they lead to,
+  and CI checks each pull request as it would merge.
 - Rules still cannot travel in a plugin, so they and `code` skills keep reaching sessions
   through `bin/link` and `bin/cloud-setup`, as ADR 0001 describes.
 - The front-matter limits from ADR 0001 still apply to `all` skills.

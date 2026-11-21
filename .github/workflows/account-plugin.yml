@@ -8,6 +8,11 @@
 # Check for updates after merging, since claude.ai does not pull a
 # marketplace I added myself on its own.
 #
+# A pull request is checked as it would merge (GitHub's merge ref, the
+# checkout default), not as its head alone: two pull requests can each pass
+# on their own and still break the plugin together. Each push to main is
+# checked as well, so a break that gets through shows up right away.
+#
 # The work itself is bin/account-plugin, which also runs locally.
 
 name: account-plugin
@@ -15,12 +20,14 @@ name: account-plugin
 on:
   pull_request:
     branches: [main]
+  push:
+    branches: [main]
 
 permissions:
   contents: read
 
 concurrency:
-  group: account-plugin-${{ github.event.pull_request.number }}
+  group: account-plugin-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
 jobs:
@@ -34,10 +41,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
       - name: Check the Account plugin
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
-          bin/account-plugin --base "origin/${{ github.event.pull_request.base.ref }}" \
-            | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ -n "$BASE_REF" ]; then
+            bin/account-plugin --base "origin/$BASE_REF" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            bin/account-plugin | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
