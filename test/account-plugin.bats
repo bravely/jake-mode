@@ -5,7 +5,7 @@
 
 setup() {
   REPO="$BATS_TEST_TMPDIR/repo"
-  mkdir -p "$REPO/.claude-plugin"
+  mkdir -p "$REPO/plugins/jake-mode/.claude-plugin" "$REPO/plugins/jake-mode/skills"
   cp -R "$BATS_TEST_DIRNAME/../bin" "$REPO/bin"
   cd "$REPO" || return 1
   git init -q -b main
@@ -13,7 +13,8 @@ setup() {
   git config user.email test@example.com
   skill kept all
   skill local code
-  printf '{"name": "jake-mode", "skills": ["./skills/test/kept"]}\n' > .claude-plugin/plugin.json
+  printf '{"name": "jake-mode"}\n' > plugins/jake-mode/.claude-plugin/plugin.json
+  ln -s ../../../skills/test/kept plugins/jake-mode/skills/kept
   git add -A
   git commit -qm base
   git switch -q -c work
@@ -34,41 +35,58 @@ check() { bin/account-plugin --base main; }
   [[ "$output" == *"need nothing"* ]]
 }
 
-@test "a new all skill missing from plugin.json fails" {
+@test "a new all skill without a link fails" {
   skill fresh all
   run check
   [ "$status" -eq 1 ]
-  [[ "$output" == *"does not list ./skills/test/fresh"* ]]
+  [[ "$output" == *"plugins/jake-mode/skills/fresh should link to ../../../skills/test/fresh"* ]]
 }
 
-@test "--write adds a new all skill to plugin.json" {
+@test "--write links a new all skill" {
   skill fresh all
   run bin/account-plugin --write --base main
   [ "$status" -eq 0 ]
-  grep -q '"./skills/test/fresh"' .claude-plugin/plugin.json
+  [ "$(readlink plugins/jake-mode/skills/fresh)" = ../../../skills/test/fresh ]
+  [ -f plugins/jake-mode/skills/fresh/SKILL.md ]
   [[ "$output" == *'- `fresh`'* ]]
   [[ "$output" == *"Check for updates"* ]]
 }
 
-@test "a listed skill that became code fails" {
+@test "a linked skill that became code fails" {
   skill kept code
   run check
   [ "$status" -eq 1 ]
-  [[ "$output" == *"lists ./skills/test/kept, which is not a skill with reach all"* ]]
+  [[ "$output" == *"plugins/jake-mode/skills/kept -> ../../../skills/test/kept is not a link to a skill with reach all"* ]]
 }
 
-@test "--write never lists a code skill" {
+@test "--write never links a code skill" {
   run bin/account-plugin --write
   [ "$status" -eq 0 ]
-  ! grep -q local .claude-plugin/plugin.json
+  [ ! -e plugins/jake-mode/skills/local ]
 }
 
-@test "a plugin nested below the root fails" {
-  mkdir -p plugins/other/.claude-plugin
-  printf '{"name": "other"}\n' > plugins/other/.claude-plugin/plugin.json
+@test "a copied skill in place of a link fails" {
+  rm plugins/jake-mode/skills/kept
+  cp -R skills/test/kept plugins/jake-mode/skills/kept
   run check
   [ "$status" -eq 1 ]
-  [[ "$output" == *"plugins/other/.claude-plugin/plugin.json: a plugin inside"* ]]
+  [[ "$output" == *"plugins/jake-mode/skills/kept -> (not a link)"* ]]
+}
+
+@test "a bin folder in the plugin fails" {
+  mkdir plugins/jake-mode/bin
+  : > plugins/jake-mode/bin/tool
+  run check
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"plugins/jake-mode/bin: the Account plugin may hold only"* ]]
+}
+
+@test "a second plugin anywhere in the repository fails" {
+  mkdir -p .claude-plugin
+  printf '{"name": "root"}\n' > .claude-plugin/plugin.json
+  run check
+  [ "$status" -eq 1 ]
+  [[ "$output" == *".claude-plugin/plugin.json: the Account plugin must be the only plugin"* ]]
 }
 
 @test "an edit to an all skill asks for a Check for updates" {

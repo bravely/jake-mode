@@ -68,9 +68,13 @@ stores it quoted, which leaves the account copy different from the file.
 ### The Account plugin
 
 This repository is a plugin marketplace. `.claude-plugin/marketplace.json`
-offers one plugin, `jake-mode`, rooted at the repository itself, and
-`.claude-plugin/plugin.json` lists each `all` skill's directory. The plugin
-has no `version`, so every commit on `main` is a release. Chat lists the
+offers one plugin, `jake-mode`, which lives in `plugins/jake-mode/`. Its
+`skills/` folder holds one symlink per `all` skill, pointing at the skill
+where it lives under `skills/`; claude.ai follows the links and stores real
+copies. The plugin cannot be the repository root, for two reasons: claude.ai
+refuses a plugin with a top-level `bin/`, and it reads every `SKILL.md`
+anywhere in a plugin's folder, so the root would carry the `code` skills to
+chat as well. The plugin has no `version`, so every commit on `main` is a release. Chat lists the
 skills under their plain names (`/availability`); Claude Code lists them as
 `jake-mode:<name>`.
 
@@ -90,12 +94,13 @@ open the marketplace in each account and click **Check for updates**.
 Claude Code picks the new version up from the account at its next start.
 
 The `account-plugin` check runs `bin/account-plugin` on every pull request.
-It fails when an `all` skill's front matter would break claude.ai, when
-`plugin.json`'s list disagrees with the skills' reach, or when another
-`.claude-plugin/plugin.json` sits below the root (claude.ai skips a root
-plugin that contains one). Its run summary says whether the accounts need a
-Check for updates after merging. After adding a skill or changing a reach,
-run `bin/account-plugin --write` to rewrite the list.
+It fails when an `all` skill's front matter would break claude.ai, when the
+links in `plugins/jake-mode/skills/` disagree with the skills' reach, when
+`plugins/jake-mode/` holds anything besides its manifest and those links, or
+when a second plugin manifest appears anywhere in the repository. Its run
+summary says whether the accounts need a Check for updates after merging.
+After adding a skill or changing a reach, run `bin/account-plugin --write`
+to rebuild the links.
 
 ## Cloud sessions
 
@@ -162,7 +167,8 @@ not own.
 | `skills/productivity/` | Personal productivity: task capture in Todoist, the GTD weekly review and retro, call notes, scheduling availability |
 | `skills/machine/` | Per-machine services a session sets up on request, such as a repo's Remote Control server |
 | `rules/` | Global rules, one concern per file |
-| `.claude-plugin/` | The Account plugin: the marketplace and the plugin manifest that lists the `all` skills |
+| `.claude-plugin/` | The marketplace, which offers the Account plugin |
+| `plugins/jake-mode/` | The Account plugin: its manifest, and one symlink per `all` skill |
 | `bin/` | Wiring (`link`, `cloud-setup`) and the Account plugin check (`account-plugin`) |
 | `.github/workflows/` | The `account-plugin` check and the tests |
 | `test/` | bats tests for the scripts in `bin/` |

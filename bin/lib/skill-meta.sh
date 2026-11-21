@@ -18,7 +18,7 @@
 # the plain line-by-line reading below never has to understand it.
 #
 # The fields:
-#   reach         all  -> carried by the Account plugin (.claude-plugin/), reaching
+#   reach         all  -> carried by the Account plugin (plugins/jake-mode/), reaching
 #                         chat, mobile and every Claude Code session through
 #                         my Claude accounts.
 #                 code -> wired by bin/link, Claude Code only. The default.
