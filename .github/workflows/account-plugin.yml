@@ -1,0 +1,43 @@
+# Keep the Account plugin sound on every pull request.
+#
+# Skills with reach `all` reach my Claude accounts through the `jake-mode`
+# plugin this repository serves (see .claude-plugin/). This check fails when
+# a skill's front matter would break claude.ai, when plugin.json's skills
+# list disagrees with the skills' reach, or when a plugin is nested inside
+# the Account plugin. Its run summary also says whether the accounts need a
+# Check for updates after merging, since claude.ai does not pull a
+# marketplace I added myself on its own.
+#
+# The work itself is bin/account-plugin, which also runs locally.
+
+name: account-plugin
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: account-plugin-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  account-plugin:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        # Named explicitly so the runner adds pipefail; a check failure in
+        # bin/account-plugin must not be hidden by the tee after it.
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Check the Account plugin
+        run: |
+          bin/account-plugin --base "origin/${{ github.event.pull_request.base.ref }}" \
+            | tee -a "$GITHUB_STEP_SUMMARY"

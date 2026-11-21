@@ -1,0 +1,11 @@
+{
+  "name": "jake-mode",
+  "owner": { "name": "bravely" },
+  "plugins": [
+    {
+      "name": "jake-mode",
+      "source": "./",
+      "description": "My skills with reach all, for chat, mobile and every Claude Code session."
+    }
+  ]
+}

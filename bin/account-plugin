@@ -1,0 +1,255 @@
+#!/usr/bin/env bash
+#
+# Check the Account plugin: the plugin this repository serves to my Claude
+# accounts, carrying every skill with reach `all`.
+#
+# Each account adds this repository as a plugin marketplace and installs
+# the `jake-mode` plugin from it. From there, the skills reach chat,
+# mobile, and every Claude Code session, local or cloud. The plugin has no
+# `version`, so every commit on main is a release. claude.ai does not pull
+# it on its own, though: after a merge, each account needs Customize >
+# Plugins > Check for updates. Why: docs/adr/0002-skills-reach-the-account-as-a-plugin.md.
+#
+# The checks, all of which must pass:
+#   - every skill's front matter is valid, and a reach `all` skill uses
+#     only the keys claude.ai accepts
+#   - .claude-plugin/plugin.json lists exactly the reach `all` skills
+#   - no other .claude-plugin/plugin.json sits anywhere below the root,
+#     since claude.ai skips a root plugin that contains another plugin
+#
+# With --base REF it also names the reach `all` skills that changed since
+# REF, so a pull request's summary says whether the accounts will need a
+# Check for updates after merging.
+#
+# --write rewrites the skills list in plugin.json from the skills' reach,
+# then runs the checks.
+
+set -euo pipefail
+
+PROG=account-plugin
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PLUGIN_JSON=".claude-plugin/plugin.json"
+
+# shellcheck source-path=SCRIPTDIR source=lib/skill-meta.sh
+. "$REPO_ROOT/bin/lib/skill-meta.sh"
+
+BASE=""
+WRITE=false
+
+usage() {
+  cat <<USAGE
+Usage: bin/$PROG [--base REF] [--write]
+
+Check every skill's front matter and the Account plugin's manifest.
+
+  --base REF  Also list the reach \`all\` skills changed since REF (compared
+              from the merge base, as a pull request diff is); uncommitted
+              changes count too
+  --write     Rewrite the skills list in $PLUGIN_JSON from each
+              skill's reach before checking
+
+Prints a Markdown summary. Exit status 1 if any check fails.
+USAGE
+}
+
+main() {
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --base)  BASE="${2:?--base needs a ref}"; shift 2 ;;
+      --write) WRITE=true; shift ;;
+      -h|--help) usage; exit 0 ;;
+      *) printf '%s: unknown option: %s\n\n' "$PROG" "$1" >&2; usage >&2; exit 2 ;;
+    esac
+  done
+
+  if [ "$WRITE" = true ]; then
+    write_skill_list
+  fi
+
+  local problems dir
+  problems="$(
+    while IFS= read -r dir; do
+      check_skill "$dir"
+    done < <(head_skill_dirs)
+    check_skill_list
+    check_no_nested_plugins
+  )"
+
+  local changed=""
+  if [ -n "$BASE" ]; then
+    changed="$(changed_all_skills)"
+  fi
+
+  summary "$problems" "$changed"
+  [ -z "$problems" ]
+}
+
+# Every skill directory in the working tree, relative to the repository
+# root, sorted.
+head_skill_dirs() {
+  (cd "$REPO_ROOT" && find skills -type f -name SKILL.md -exec dirname {} \; | sort)
+}
+
+# The reach `all` skill directories, as plugin.json spells them
+# ("./skills/<category>/<name>"), sorted.
+expected_skill_list() {
+  local dir
+  while IFS= read -r dir; do
+    [ "$(skill_reach "$REPO_ROOT/$dir")" = all ] && printf './%s\n' "$dir"
+  done < <(head_skill_dirs)
+  return 0
+}
+
+# The skills list plugin.json has now, one entry per line, sorted.
+actual_skill_list() {
+  ruby -rjson -e '
+    list = JSON.parse(File.read(ARGV[0]))["skills"]
+    list = [list] if list.is_a?(String)
+    puts (list || []).sort' "$REPO_ROOT/$PLUGIN_JSON"
+}
+
+write_skill_list() {
+  expected_skill_list | ruby -rjson -e '
+    path = ARGV[0]
+    manifest = JSON.parse(File.read(path))
+    manifest["skills"] = $stdin.read.split("\n")
+    File.write(path, JSON.pretty_generate(manifest) + "\n")' "$REPO_ROOT/$PLUGIN_JSON"
+}
+
+check_skill_list() {
+  if [ ! -f "$REPO_ROOT/$PLUGIN_JSON" ]; then
+    printf '%s is missing\n' "$PLUGIN_JSON"
+    return
+  fi
+  local actual expected entry
+  if ! actual="$(actual_skill_list 2>&1)"; then
+    printf '%s could not be read: %s\n' "$PLUGIN_JSON" "$actual"
+    return
+  fi
+  expected="$(expected_skill_list)"
+  while IFS= read -r entry; do
+    [ -n "$entry" ] && printf '%s does not list %s, whose reach is all (run bin/%s --write)\n' "$PLUGIN_JSON" "$entry" "$PROG"
+  done < <(comm -13 <(printf '%s\n' "$actual") <(printf '%s\n' "$expected"))
+  while IFS= read -r entry; do
+    [ -n "$entry" ] && printf '%s lists %s, which is not a skill with reach all (run bin/%s --write)\n' "$PLUGIN_JSON" "$entry" "$PROG"
+  done < <(comm -23 <(printf '%s\n' "$actual") <(printf '%s\n' "$expected"))
+  return 0
+}
+
+check_no_nested_plugins() {
+  local found
+  while IFS= read -r found; do
+    printf '%s: a plugin inside the Account plugin makes claude.ai skip the Account plugin\n' "$found"
+  done < <(cd "$REPO_ROOT" && find . -path ./.git -prune -o -path "*/.claude-plugin/plugin.json" -print |
+             sed 's|^\./||' | grep -vxF "$PLUGIN_JSON" | sort)
+  return 0
+}
+
+# Print the names of the skills that changed since the merge base and are
+# or were reach `all`, one per line. The working tree counts, untracked
+# files included, so a local run before committing sees what CI will see
+# after.
+changed_all_skills() {
+  local mb dir before_reach after_reach tmp
+  mb="$(git -C "$REPO_ROOT" merge-base "$BASE" HEAD)"
+  tmp="$(mktemp)"
+  {
+    head_skill_dirs
+    git -C "$REPO_ROOT" ls-tree -r --name-only "$mb" -- skills | sed -n 's|/SKILL\.md$||p'
+  } | sort -u | while IFS= read -r dir; do
+    if git -C "$REPO_ROOT" diff --quiet "$mb" -- "$dir" &&
+       [ -z "$(git -C "$REPO_ROOT" ls-files --others --exclude-standard -- "$dir")" ]; then
+      continue
+    fi
+    if git -C "$REPO_ROOT" cat-file -e "$mb:$dir/SKILL.md" 2>/dev/null; then
+      git -C "$REPO_ROOT" show "$mb:$dir/SKILL.md" > "$tmp"
+      before_reach="$(skill_file_reach "$tmp")"
+    else
+      before_reach=none
+    fi
+    if [ -f "$REPO_ROOT/$dir/SKILL.md" ]; then
+      after_reach="$(skill_reach "$REPO_ROOT/$dir")"
+    else
+      after_reach=none
+    fi
+    if [ "$after_reach" = all ] || [ "$before_reach" = all ]; then
+      basename "$dir"
+    fi
+  done | sort -u
+  rm -f "$tmp"
+}
+
+# Print one line per problem with the given skill directory (relative to
+# the repository root), nothing when it is fine. Every skill needs front
+# matter that parses as YAML, a valid reach and a block-style metadata
+# map; reach `all` skills must also pass what claude.ai checks. Reach
+# `code` skills may use any key Claude Code understands, since they never
+# reach claude.ai.
+check_skill() {
+  local dir="$1" file="$REPO_ROOT/$1/SKILL.md" fm reach name desc key
+  fm="$(skill_frontmatter "$file")"
+  if [ -z "$fm" ]; then
+    printf '%s: no front matter\n' "$dir"
+    return
+  fi
+
+  local yaml_error; yaml_error="$(skill_frontmatter_yaml_error "$file")"
+  if [ -n "$yaml_error" ]; then
+    printf '%s: front matter is not valid YAML: %s\n' "$dir" "$yaml_error"
+  fi
+
+  if printf '%s\n' "$fm" | grep -qE '^metadata:[[:space:]]*[^[:space:]#]'; then
+    printf '%s: metadata must be a block map, one "key: value" per indented line\n' "$dir"
+  fi
+  reach="$(skill_reach "$REPO_ROOT/$dir")"
+  case "$reach" in
+    all|code) ;;
+    *) printf '%s: metadata.reach is "%s"; it must be all or code\n' "$dir" "$reach" ;;
+  esac
+
+  name="$(printf '%s\n' "$fm" | sed -n 's/^name:[[:space:]]*//p' | head -1 | sed 's/^["'\'']//; s/["'\'']$//')"
+  if [ "$name" != "$(basename "$dir")" ]; then
+    printf '%s: name "%s" does not match the directory name\n' "$dir" "$name"
+  fi
+
+  [ "$reach" = all ] || return 0
+
+  while IFS= read -r key; do
+    case " $ACCOUNT_FRONTMATTER_KEYS " in
+      *" $key "*) ;;
+      *) printf '%s: claude.ai rejects the front matter key "%s" (allowed: %s)\n' \
+           "$dir" "$key" "$ACCOUNT_FRONTMATTER_KEYS" ;;
+    esac
+  done < <(printf '%s\n' "$fm" | sed -n 's/^\([A-Za-z0-9_-]*\):.*/\1/p')
+
+  if ! printf '%s' "$name" | grep -qE '^[a-z0-9-]{1,64}$'; then
+    printf '%s: name must be 1-64 lowercase letters, digits and hyphens\n' "$dir"
+  fi
+  desc="$(printf '%s\n' "$fm" | sed -n 's/^description:[[:space:]]*//p' | head -1 | sed 's/^["'\'']//; s/["'\'']$//')"
+  if [ -z "$desc" ]; then
+    printf '%s: no description\n' "$dir"
+  elif [ "${#desc}" -gt 1024 ]; then
+    printf '%s: description is %d characters; claude.ai allows 1024\n' "$dir" "${#desc}"
+  fi
+}
+
+# Print the Markdown summary for the given problems and changed skills.
+summary() {
+  local problems="$1" changed="$2"
+  if [ -n "$problems" ]; then
+    printf '### Account plugin problems\n\n'
+    printf '%s\n' "$problems" | sed 's/^/- /'
+    printf '\n'
+  fi
+  [ -n "$BASE" ] || return 0
+  if [ -z "$changed" ]; then
+    printf 'No skill with reach `all` changed, so the Claude accounts need nothing.\n'
+    return
+  fi
+  printf '### After merging\n\n'
+  printf 'These skills with reach `all` changed:\n\n'
+  printf '%s\n' "$changed" | sed 's/.*/- `&`/'
+  printf '\nIn each Claude account, open Customize > Plugins, then the `jake-mode` marketplace, and click **Check for updates**.\n'
+}
+
+main "$@"

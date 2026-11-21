@@ -46,10 +46,10 @@ bin/link
 One run wires both kinds of entry. Skills: every directory under `skills/`
 that contains a `SKILL.md`, linked under the directory name into
 `~/.claude/skills/`, **except** skills whose front matter sets
-`metadata.reach: all`. Those are uploaded to the Claude account, which syncs
-them into every session as `anthropic-skills:<name>`, so a link would list
-them twice. The run prints a `skip` line for each one. `--include-all` links
-them anyway, to try an edit before it is uploaded; a later plain
+`metadata.reach: all`. Those are carried by the Account plugin, which the
+Claude account syncs into every session as `jake-mode:<name>`, so a link would
+list them twice. The run prints a `skip` line for each one. `--include-all` links
+them anyway, to try an edit before it is merged; a later plain
 `bin/link --prune` takes those links away again. Rules: every `.md` under `rules/`, linked into
 `~/.claude/rules/`, which Claude Code loads into every session, following
 symlinks. One link per rule rather than linking the directory itself, so
@@ -85,8 +85,9 @@ Work through these in order.
 1. **The link is missing or stale.** Run `bin/link --dry-run` and see
    whether it reports the entry as already current. A `skip` line means the
    skill has reach `all`: it arrives through the Claude account, not a
-   link. If it is missing, either it has not been uploaded yet (the
-   README's "Reach" section has the steps) or the session is not signed in
+   link. If it is missing, either the account has not installed the
+   `jake-mode` plugin or checked it for updates since the merge (the
+   README's "Reach" section has the steps), or the session is not signed in
    with that account.
 
 2. **Something else owns the name.** The script refuses to clobber an entry it

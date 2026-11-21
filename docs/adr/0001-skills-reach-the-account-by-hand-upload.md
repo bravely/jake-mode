@@ -1,3 +1,7 @@
+---
+status: superseded by ADR-0002
+---
+
 # Skills reach my Claude account by hand upload, gated in CI; cloud sessions wire the rest
 
 A skill with reach `all` has to work in chat, on mobile, and in Claude Code cloud sessions,
