@@ -87,20 +87,37 @@ Code only):
 2. Search the marketplace for `jake-mode` and install it. Adding the
    marketplace alone installs nothing.
 3. In a new chat, run one of the skills.
+4. At Customize > Skills, delete any skill of the same name that was
+   uploaded by hand before the plugin existed. Otherwise each one is listed
+   twice: once from the upload, and once from the plugin.
 
 claude.ai does not pull the marketplace on its own, even with **Sync
 automatically** switched on. After a merge that changes an `all` skill,
-open the marketplace in each account and click **Check for updates**.
+or that changes the plugin's manifest or the marketplace, open the
+marketplace in each account and click **Check for updates**.
 Claude Code picks the new version up from the account at its next start.
 
-The `account-plugin` check runs `bin/account-plugin` on every pull request.
-It fails when an `all` skill's front matter would break claude.ai, when the
-links in `plugins/jake-mode/skills/` disagree with the skills' reach, when
-`plugins/jake-mode/` holds anything besides its manifest and those links, or
-when a second plugin manifest appears anywhere in the repository. Its run
-summary says whether the accounts need a Check for updates after merging.
-After adding a skill or changing a reach, run `bin/account-plugin --write`
-to rebuild the links.
+The `account-plugin` check runs `bin/account-plugin` on every pull request,
+as the pull request would merge, and on every push to `main`. It checks
+what claude.ai would publish: the plugin folder, plus every skill folder
+its links lead to, counting only files git would publish. It fails when:
+
+- an `all` skill's front matter would break claude.ai, read with a real
+  YAML parser: a key claude.ai rejects, a bad name, or a description that
+  is missing, longer than 1024 characters, or contains `<` or `>`
+- the links in `plugins/jake-mode/skills/` disagree with the skills' reach,
+  or two `all` skills share a name
+- `plugins/jake-mode/` holds anything besides its manifest and those links
+- a linked skill folder holds a symlink, or a `SKILL.md` or `.claude-plugin`
+  below its own, since claude.ai would publish whatever they lead to
+- `plugin.json` or `marketplace.json` does not parse, sets a `version`, or
+  does not name and point at `plugins/jake-mode`
+- a second plugin manifest appears anywhere in the repository
+
+Its run summary says whether the accounts need a Check for updates after
+merging. After adding a skill or changing a reach, run
+`bin/account-plugin --write` to rebuild the links. It refuses to replace
+anything in `plugins/jake-mode/skills/` that is not a symlink.
 
 ## Cloud sessions
 
@@ -173,7 +190,7 @@ not own.
 | `.github/workflows/` | The `account-plugin` check and the tests |
 | `test/` | bats tests for the scripts in `bin/` |
 | `licenses/` | Upstream license texts |
-| `GLOSSARY.md` | The terms this library uses for its own skills: Promoted, Experimental, Reach, Wiring |
+| `GLOSSARY.md` | The terms this library uses for its own skills: Promoted, Experimental, Reach, Account plugin, Wiring |
 | `docs/adr/` | Decisions about how skills and rules reach each place Claude runs |
 
 Categories are for humans reading the repository. They disappear at the symlink
