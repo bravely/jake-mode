@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 #
 # Tests for bin/lib/skill-meta.sh, the front matter reader that bin/link
-# and bin/claude-account-upload share. Run with `bats test/`.
+# and bin/account-plugin share. Run with `bats test/`.
 
 setup() {
   # shellcheck source=../bin/lib/skill-meta.sh
@@ -88,7 +88,7 @@ EOF
   skill <<'EOF'
 ---
 metadata:
-  reach: all   # uploaded by hand
+  reach: all   # carried by the Account plugin
 ---
 EOF
   run skill_file_metadata "$SKILL" reach

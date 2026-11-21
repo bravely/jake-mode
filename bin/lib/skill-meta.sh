@@ -1,11 +1,11 @@
 # shellcheck shell=bash
 # Read the custom fields a skill carries in its SKILL.md front matter.
-# Sourced, not run: bin/link and bin/claude-account-upload both need the
+# Sourced, not run: bin/link and bin/account-plugin both need the
 # same answer to "what is this skill's reach?", so the parsing lives here
 # once.
 #
 # Custom fields live under the `metadata:` map, because claude.ai rejects
-# an upload whose front matter has any other top-level key it does not know
+# a skill whose front matter has any other top-level key it does not know
 # (it accepts only name, description, license, compatibility, metadata and
 # allowed-tools). The map must be block style, one `key: value` per
 # indented line:
@@ -14,12 +14,13 @@
 #     reach: all
 #     experimental: true
 #
-# bin/claude-account-upload rejects the inline `metadata: {...}` form, so
+# bin/account-plugin rejects the inline `metadata: {...}` form, so
 # the plain line-by-line reading below never has to understand it.
 #
 # The fields:
-#   reach         all  -> uploaded to the Claude account by hand, reaching chat,
-#                         mobile and every Claude Code session through it.
+#   reach         all  -> carried by the Account plugin (.claude-plugin/), reaching
+#                         chat, mobile and every Claude Code session through
+#                         my Claude accounts.
 #                 code -> wired by bin/link, Claude Code only. The default.
 #   experimental  true while the skill is still being tried out. Nothing
 #                 reads it; it is for the person reading the skill.
@@ -84,7 +85,7 @@ skill_file_metadata() {
 
 # Print the reach of the given skill directory: its `metadata.reach`, or
 # `code` when it has none. An unknown value is printed as-is so that the
-# check in bin/claude-account-upload can name it; everything else treats
+# check in bin/account-plugin can name it; everything else treats
 # any value but `all` as code.
 skill_reach() { skill_file_reach "$1/SKILL.md"; }
 
@@ -94,7 +95,7 @@ skill_file_reach() {
   printf '%s\n' "${reach:-code}"
 }
 
-# The top-level keys claude.ai accepts in an uploaded skill's front matter.
-# Anything else fails the upload. Read by bin/claude-account-upload.
+# The top-level keys claude.ai accepts in a skill's front matter. Anything
+# else is rejected. Read by bin/account-plugin.
 # shellcheck disable=SC2034
 ACCOUNT_FRONTMATTER_KEYS="name description license compatibility metadata allowed-tools"

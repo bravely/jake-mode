@@ -12,15 +12,15 @@
 #
 # Skills with reach `all` are deliberately NOT linked. Each skill says
 # where it can be used through `metadata.reach` in its front matter (see
-# bin/lib/skill-meta.sh). A reach `all` skill is uploaded by hand to the
-# Claude account, and Claude Code syncs account skills into every session
-# on its own, as anthropic-skills:<name>. Linking it here as well would
-# list it twice in every session, so this script leaves it to the sync.
-# The cost: an edit to an `all` skill is not live locally until it is
-# uploaded. To try an edit before then, link it on purpose with
-# --include-all and accept the duplicate until the next plain --prune run
-# removes it. Why the upload is by hand and how it is gated:
-# .github/workflows/claude-account-upload.yml.
+# bin/lib/skill-meta.sh). A reach `all` skill is carried by the Account
+# plugin, which each Claude account installs, and Claude Code syncs account
+# plugins into every session on its own, as jake-mode:<name>. Linking it
+# here as well would list it twice in every session, so this script leaves
+# it to the sync. The cost: an edit to an `all` skill is not live locally
+# until it is merged and the account has checked for updates. To try an
+# edit before then, link it on purpose with --include-all and accept the
+# duplicate until the next plain --prune run removes it. Why a plugin:
+# docs/adr/0002-skills-reach-the-account-as-a-plugin.md.
 #
 # Safe to re-run. Nothing is touched until every kind has passed its
 # checks, and a failure in one kind does not stop the other.
@@ -144,7 +144,7 @@ Options:
       --prune              Remove links into this repo whose entry no longer exists
   -f, --force              Replace a conflicting entry that this repo does not own
       --include-all        Also link reach \`all\` skills, to try an edit before
-                           uploading it (they then show up twice)
+                           it is merged (they then show up twice)
   -h, --help              Show this message
 
 Nothing is touched until every kind passes its checks. Exit status is 1 if

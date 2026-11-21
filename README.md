@@ -48,14 +48,14 @@ metadata:
 
 - **`code`** skills are for Claude Code only. `bin/link` wires them on a Mac,
   and `bin/cloud-setup` wires them in cloud sessions.
-- **`all`** skills are uploaded by hand to my Claude account, which delivers
-  them to chat, mobile and every Claude Code session, local or cloud.
-  `bin/link` deliberately does **not** link them, because the account sync
-  already puts them in every session and a link would list them twice.
-  `bin/link --include-all` links them anyway, so an edit can be tried locally
-  before it is uploaded.
+- **`all`** skills are carried by the **Account plugin**, which each of my
+  Claude accounts installs, and which delivers them to chat, mobile and
+  every Claude Code session, local or cloud. `bin/link` deliberately does
+  **not** link them, because the account sync already puts them in every
+  session and a link would list them twice. `bin/link --include-all` links
+  them anyway, so an edit can be tried locally before it is merged.
 
-Custom fields go under `metadata` because claude.ai rejects an upload whose
+Custom fields go under `metadata` because claude.ai rejects a skill whose
 front matter has any other key it does not know. The only top-level keys an
 `all` skill may use are `name`, `description`, `license`, `compatibility`,
 `metadata` and `allowed-tools`.
@@ -65,21 +65,43 @@ containing `: `, such as `description: Works for any call: work meetings`,
 is not valid YAML, so quote it. claude.ai accepts the unquoted form and
 stores it quoted, which leaves the account copy different from the file.
 
-claude.ai has no upload API, so the upload is by hand, and CI keeps it from
-being forgotten. The `claude-account-upload` check runs on every pull
-request. When the pull request changes an `all` skill, the run summary lists
-what to upload or delete at claude.ai (Customize > Skills), and the run's
-`claude-account-upload` artifact holds the zips. The check fails until the
-pull request has the `claude-account-synced` label. Add the label once the
-account matches, or add it to skip syncing on purpose. A later push that
-changes an `all` skill again removes the label. To build the zips locally,
-run `bin/claude-account-upload`; add `--base main` to get only what a branch
-changed.
+### The Account plugin
+
+This repository is a plugin marketplace. `.claude-plugin/marketplace.json`
+offers one plugin, `jake-mode`, rooted at the repository itself, and
+`.claude-plugin/plugin.json` lists each `all` skill's directory. The plugin
+has no `version`, so every commit on `main` is a release. Chat lists the
+skills under their plain names (`/availability`); Claude Code lists them as
+`jake-mode:<name>`.
+
+To set up an account, on the Chat side of claude.ai or the desktop app
+(not the Code tab, whose plugin screen installs into one machine's Claude
+Code only):
+
+1. Customize > Plugins > Add > **Add marketplace**, and enter
+   `bravely/jake-mode`.
+2. Search the marketplace for `jake-mode` and install it. Adding the
+   marketplace alone installs nothing.
+3. In a new chat, run one of the skills.
+
+claude.ai does not pull the marketplace on its own, even with **Sync
+automatically** switched on. After a merge that changes an `all` skill,
+open the marketplace in each account and click **Check for updates**.
+Claude Code picks the new version up from the account at its next start.
+
+The `account-plugin` check runs `bin/account-plugin` on every pull request.
+It fails when an `all` skill's front matter would break claude.ai, when
+`plugin.json`'s list disagrees with the skills' reach, or when another
+`.claude-plugin/plugin.json` sits below the root (claude.ai skips a root
+plugin that contains one). Its run summary says whether the accounts need a
+Check for updates after merging. After adding a skill or changing a reach,
+run `bin/account-plugin --write` to rewrite the list.
 
 ## Cloud sessions
 
 A Claude Code cloud session (claude.ai/code) runs in a fresh VM that never
-sees this machine's `~/.claude`. `all` skills reach it through the account.
+sees this machine's `~/.claude`. `all` skills reach it through the account,
+which syncs the Account plugin into cloud sessions too.
 `code` skills and the rules reach it through each cloud environment's
 **setup script**, which clones this repository and runs `bin/cloud-setup`.
 That script wires everything into the VM's `~/.claude` the way `bin/link`
@@ -140,8 +162,9 @@ not own.
 | `skills/productivity/` | Personal productivity: task capture in Todoist, the GTD weekly review and retro, call notes, scheduling availability |
 | `skills/machine/` | Per-machine services a session sets up on request, such as a repo's Remote Control server |
 | `rules/` | Global rules, one concern per file |
-| `bin/` | Wiring (`link`, `cloud-setup`) and the account upload (`claude-account-upload`) |
-| `.github/workflows/` | The `claude-account-upload` check and the tests |
+| `.claude-plugin/` | The Account plugin: the marketplace and the plugin manifest that lists the `all` skills |
+| `bin/` | Wiring (`link`, `cloud-setup`) and the Account plugin check (`account-plugin`) |
+| `.github/workflows/` | The `account-plugin` check and the tests |
 | `test/` | bats tests for the scripts in `bin/` |
 | `licenses/` | Upstream license texts |
 | `GLOSSARY.md` | The terms this library uses for its own skills: Promoted, Experimental, Reach, Wiring |
@@ -157,7 +180,7 @@ flight. Directories appear as their phases complete.
 
 Tests for the scripts in `bin/` live under `test/` and run with
 [bats](https://github.com/bats-core/bats-core). So far they cover
-`bin/lib/skill-meta.sh` and the `--base` plan of `bin/claude-account-upload`.
+`bin/lib/skill-meta.sh` and `bin/account-plugin`.
 bats is expected to be installed already: my dotfiles'
 Brewfile installs it on every Mac, or run `brew install bats-core`. Then,
 from the repository root:

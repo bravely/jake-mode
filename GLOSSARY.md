@@ -13,8 +13,12 @@ A skill of my own that is still being tried out, which a metadata field on the s
 _Avoid_: Draft skill, local skill
 
 **Reach**:
-Where a skill of mine can be used. A skill with reach `all` is uploaded to my Claude account, so it works in chat, on mobile, and in every kind of Claude Code session. A skill with reach `code` works only in Claude Code sessions, local or cloud. A skill is `code` unless its metadata field says otherwise.
+Where a skill of mine can be used. A skill with reach `all` is carried by the Account plugin, so it works in chat, on mobile, and in every kind of Claude Code session. A skill with reach `code` works only in Claude Code sessions, local or cloud. A skill is `code` unless its metadata field says otherwise.
 _Avoid_: Scope, surface (a surface is one place Claude runs, not a setting of the skill)
+
+**Account plugin**:
+The plugin this repo serves to each of my Claude accounts, carrying every skill with reach `all`.
+_Avoid_: Plugin skill (dotfiles' term for a skill someone else wrote that arrives through a Declared plugin)
 
 **Wiring**:
 Making a skill or rule visible to Claude Code by linking it from where it lives into the harness's own directories.

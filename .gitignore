@@ -1,6 +1,3 @@
 .DS_Store
 *.swp
 node_modules/
-
-# bin/claude-account-upload output
-claude-account-upload/
