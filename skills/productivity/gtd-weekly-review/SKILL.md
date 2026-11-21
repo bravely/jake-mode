@@ -44,9 +44,9 @@ If you can infer a reasonable first action from context, use it. If you genuinel
 Flag as stale when:
 - A project has no incomplete tasks (possibly abandoned or quietly finished)
 - A project's tasks are all undated (no surfaced next action)
-- A task outside of Someday/Maybe has no due date (surface it and let the user decide)
+- A task outside of Someday/Maybe and Watch & Read has no due date (surface it and let the user decide)
 
-Don't flag tasks inside Someday/Maybe as stale — that's normal for that project.
+Don't flag tasks inside Someday/Maybe or Watch & Read as stale — that's normal for those projects.
 
 ---
 
@@ -121,7 +121,7 @@ For each, ask: still waiting, got a response, or need to follow up?
 
 **Goal**: make sure every active project has a clear next action.
 
-Pull all projects, excluding Inbox, Someday/Maybe, and Todo (which is the Next Actions list, not a true project).
+Pull all projects, excluding Inbox, Someday/Maybe, Watch & Read, and Todo (which is the Next Actions list, not a true project).
 
 For each project, check whether it has a task currently surfaced in Todo as its active next action. Flag a project if:
 - It has no tasks at all (possibly done or abandoned)
@@ -149,6 +149,15 @@ Options for each item:
 - **Activate it**: move to an active project and help add a next action
 - **Drop it**: mark complete
 
+### Watch & Read glance
+
+Pull the tasks in the **Watch & Read** project and offer them as a menu: titles only, one per line. Ask: "Anything here sound good for this week?"
+
+- **They pick one**: ask whether they want it surfaced somewhere easy to grab, such as favorited or pinned. Leave it undated; a due date turns a menu item into an obligation.
+- **Nothing appeals**: move straight to Phase 7.
+
+The step is done once they've picked or passed.
+
 ---
 
 ## Phase 7: Next Actions Sweep
@@ -156,8 +165,8 @@ Options for each item:
 **Goal**: surface anything overdue or unscheduled that needs a decision.
 
 Pull:
-1. Overdue tasks (excluding Someday/Maybe)
-2. Undated tasks outside Someday/Maybe
+1. Overdue tasks (excluding Someday/Maybe and Watch & Read)
+2. Undated tasks outside Someday/Maybe and Watch & Read
 
 **Overdue tasks**: present and resolve these directly -- there are usually few of them and each one needs a concrete decision (reschedule, complete, or move to Someday/Maybe).
 
