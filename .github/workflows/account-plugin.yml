@@ -1,10 +1,10 @@
 # Keep the Account plugin sound on every pull request.
 #
 # Skills with reach `all` reach my Claude accounts through the `jake-mode`
-# plugin this repository serves (see .claude-plugin/). This check fails when
-# a skill's front matter would break claude.ai, when plugin.json's skills
-# list disagrees with the skills' reach, or when a plugin is nested inside
-# the Account plugin. Its run summary also says whether the accounts need a
+# plugin this repository serves (see plugins/jake-mode/). This check fails
+# when a skill's front matter would break claude.ai, when the plugin's skill
+# links disagree with the skills' reach, or when the plugin folder holds
+# anything claude.ai would read or refuse. Its run summary also says whether the accounts need a
 # Check for updates after merging, since claude.ai does not pull a
 # marketplace I added myself on its own.
 #
