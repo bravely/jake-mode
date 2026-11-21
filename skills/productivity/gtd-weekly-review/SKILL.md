@@ -149,6 +149,15 @@ Options for each item:
 - **Activate it**: move to an active project and help add a next action
 - **Drop it**: mark complete
 
+### Watch & Read glance
+
+Pull the tasks in the **Watch & Read** project and offer them as a menu: titles only, one per line. Ask: "Anything here sound good for this week?"
+
+- **They pick one**: ask whether they want it surfaced somewhere easy to grab, such as favorited or pinned. Leave it undated; a due date turns a menu item into an obligation.
+- **Nothing appeals**: move straight to Phase 7.
+
+The step is done once they've picked or passed.
+
 ---
 
 ## Phase 7: Next Actions Sweep
