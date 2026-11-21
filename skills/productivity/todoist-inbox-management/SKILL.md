@@ -1,6 +1,6 @@
 ---
 name: "todoist-inbox-management"
-description: "Governs how Claude handles all Todoist task creation and changes for Jake. Use this skill any time Jake asks to add something to his to-do list or Todoist inbox, mentions a task in passing that might belong in his inbox, or when wrapping up a conversation where tasks have been collected on a running list. Also use any time Jake asks to complete, reschedule, or otherwise update an existing Todoist task, especially a recurring one. Also use when deciding how to frame a task title, whether to ask clarifying questions before adding a task, or when determining whether context should accompany a task. This skill should always be active in the background — treat it as the standing protocol for all task-capture and task-change behavior.\n"
+description: "Governs how Claude handles all Todoist task creation and changes for Jake. Use this skill any time Jake asks to add something to his to-do list or Todoist inbox, mentions a task in passing that might belong in his inbox, or when wrapping up a conversation where tasks have been collected on a running list. Also use any time Jake asks to complete, reschedule, or otherwise update an existing Todoist task, especially a recurring one, and any time Jake processes his inbox. Also use when deciding how to frame a task title, whether to ask clarifying questions before adding a task, or when determining whether context should accompany a task. This skill should always be active in the background — treat it as the standing protocol for all task-capture and task-change behavior.\n"
 metadata:
   reach: all
 ---
@@ -11,7 +11,8 @@ This skill defines the complete protocol for how Claude captures tasks into Jake
 Todoist inbox. It covers: when to use Todoist directly vs. a running list, how to
 frame task titles, when to ask clarifying questions, and what context to include.
 It also covers how to complete and reschedule existing tasks without breaking
-recurrence (see Step 8).
+recurrence (see Step 8), and how to batch changes during inbox processing (see
+Step 9).
 
 ---
 
@@ -192,6 +193,29 @@ field holds the repeat pattern, or `false`.
 
 ---
 
+## Step 9: Processing the Inbox (Batch the Changes)
+
+Whenever Jake works through his inbox, including inside another skill such as
+the weekly review, his decisions build a **changeset** that is applied once, at
+the end. Until then, Todoist is read-only: fetch tasks, projects, and labels
+freely, and hold every complete, move, reschedule, relabel, and edit in the
+changeset.
+
+1. **Record.** As Jake decides on an item, add one changeset entry naming the
+   task and the change (`Call dentist: reschedule to Friday`), then present the
+   next item. Each task has exactly one entry: when Jake revises an earlier
+   decision, rewrite that entry in place.
+2. **Summarise.** When the inbox runs out or Jake says he's done, show the whole
+   changeset in one summary and ask him to confirm. If he edits it, show the
+   revised changeset and ask again.
+3. **Apply.** On confirmation, apply the changeset in one batch, grouping tasks
+   into a single call wherever the tool accepts several, and following Step 8
+   for every date change and completion. Done when every entry is either
+   applied or reported to Jake as failed, with the error; failed entries wait
+   for his call.
+
+---
+
 ## Quick Reference
 
 | Situation | Action |
@@ -210,3 +234,5 @@ field holds the repeat pattern, or `false`.
 | Move a task's date | `reschedule-tasks`, never `update-tasks` + `dueString` on a recurring task |
 | Complete a task | `complete-tasks` |
 | After moving or completing a recurring task | Re-fetch, confirm it still recurs, flag it if not |
+| Processing the inbox | Record each decision in the changeset; Todoist stays read-only |
+| End of inbox, or Jake says done | Show the whole changeset, apply it in one batch once he confirms |
