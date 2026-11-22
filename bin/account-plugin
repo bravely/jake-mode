@@ -14,28 +14,44 @@
 # because claude.ai refuses a plugin with a top-level bin/ and reads every
 # SKILL.md anywhere in a plugin's folder. Its skills/ holds one symlink per
 # reach `all` skill, pointing at the skill where it lives under skills/.
+# claude.ai follows those links, so what it publishes is the plugin folder
+# plus every linked skill folder. The checks look at exactly that, counting
+# only files git would publish (tracked, or untracked and not ignored).
 #
 # The checks, all of which must pass:
-#   - every skill's front matter is valid, and a reach `all` skill uses
-#     only the keys claude.ai accepts
-#   - plugins/jake-mode/skills/ links exactly the reach `all` skills
-#   - plugins/jake-mode/ holds nothing else claude.ai would read or refuse:
-#     only its manifest and those links
+#   - every skill's front matter is valid YAML with a valid reach, and a
+#     reach `all` skill uses only the keys claude.ai accepts, a name it
+#     accepts, and a description of 1-1024 characters with no < or >
+#   - plugins/jake-mode/skills/ links exactly the reach `all` skills, with
+#     no two sharing a name
+#   - plugins/jake-mode/ holds only .claude-plugin/plugin.json and those
+#     links
+#   - a linked skill folder holds no symlink and no SKILL.md or
+#     .claude-plugin below its own SKILL.md, since claude.ai would publish
+#     whatever they lead to
+#   - plugin.json and .claude-plugin/marketplace.json parse, name the
+#     plugin `jake-mode`, set no `version`, and the marketplace points at
+#     plugins/jake-mode
 #   - plugins/jake-mode/.claude-plugin/plugin.json is the only plugin
 #     manifest in the repository
 #
-# With --base REF it also names the reach `all` skills that changed since
-# REF, so a pull request's summary says whether the accounts will need a
-# Check for updates after merging.
+# With --base REF it also says whether what the plugin publishes changed
+# since REF, so a pull request's summary says whether the accounts will
+# need a Check for updates after merging.
 #
 # --write rebuilds the links from the skills' reach, then runs the checks.
+# It refuses to touch an entry in plugins/jake-mode/skills/ that is not a
+# symlink, and refuses to write at all when two reach `all` skills share a
+# name.
 
 set -euo pipefail
 
 PROG=account-plugin
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PLUGIN_DIR="plugins/jake-mode"
+PLUGIN_NAME="jake-mode"
+PLUGIN_DIR="plugins/$PLUGIN_NAME"
 PLUGIN_JSON="$PLUGIN_DIR/.claude-plugin/plugin.json"
+MARKETPLACE_JSON=".claude-plugin/marketplace.json"
 LINK_DIR="$PLUGIN_DIR/skills"
 
 # shellcheck source-path=SCRIPTDIR source=lib/skill-meta.sh
@@ -50,13 +66,14 @@ Usage: bin/$PROG [--base REF] [--write]
 
 Check every skill's front matter and the Account plugin in $PLUGIN_DIR/.
 
-  --base REF  Also list the reach \`all\` skills changed since REF (compared
-              from the merge base, as a pull request diff is); uncommitted
-              changes count too
+  --base REF  Also say whether what the plugin publishes changed since REF
+              (compared from the merge base, as a pull request diff is);
+              uncommitted changes count too
   --write     Rebuild the links in $LINK_DIR/ from each skill's
               reach before checking
 
-Prints a Markdown summary. Exit status 1 if any check fails.
+Prints a Markdown summary. Exit status 1 if any check fails, 2 for a bad
+option or a --base that is not a commit.
 USAGE
 }
 
@@ -70,8 +87,20 @@ main() {
     esac
   done
 
+  local mb=""
+  if [ -n "$BASE" ]; then
+    if ! git -C "$REPO_ROOT" rev-parse --verify --quiet "$BASE^{commit}" >/dev/null; then
+      printf '%s: --base %s is not a commit\n' "$PROG" "$BASE" >&2
+      exit 2
+    fi
+    if ! mb="$(git -C "$REPO_ROOT" merge-base "$BASE" HEAD)"; then
+      printf '%s: %s and HEAD share no history\n' "$PROG" "$BASE" >&2
+      exit 2
+    fi
+  fi
+
   if [ "$WRITE" = true ]; then
-    write_links
+    write_links || exit 1
   fi
 
   local problems dir
@@ -79,18 +108,32 @@ main() {
     while IFS= read -r dir; do
       check_skill "$dir"
     done < <(head_skill_dirs)
+    check_duplicate_names
     check_links
     check_plugin_folder
+    check_linked_skill_folders
+    check_manifests
     check_single_manifest
   )"
 
   local changed=""
-  if [ -n "$BASE" ]; then
-    changed="$(changed_all_skills)"
+  if [ -n "$mb" ]; then
+    changed="$(changed_published "$mb")"
   fi
 
   summary "$problems" "$changed"
   [ -z "$problems" ]
+}
+
+# The files git would publish under the given path, relative to the
+# repository root, sorted: tracked files still present, plus untracked
+# ones that are not ignored. A symlink is listed as itself, not followed.
+published_files() {
+  local path
+  git -C "$REPO_ROOT" -c core.quotePath=false ls-files --cached --others --exclude-standard -- "$1" |
+    while IFS= read -r path; do
+      [ -e "$REPO_ROOT/$path" ] || [ -L "$REPO_ROOT/$path" ] && printf '%s\n' "$path"
+    done | sort -u
 }
 
 # Every skill directory in the working tree, relative to the repository
@@ -99,38 +142,78 @@ head_skill_dirs() {
   (cd "$REPO_ROOT" && find skills -type f -name SKILL.md -exec dirname {} \; | sort)
 }
 
-# One "<name> <link target>" line per reach `all` skill, sorted: the links
-# $LINK_DIR/ should hold. Targets are relative to $LINK_DIR/.
-expected_links() {
+# The reach `all` skill directories, sorted.
+all_skill_dirs() {
   local dir
   while IFS= read -r dir; do
-    [ "$(skill_reach "$REPO_ROOT/$dir")" = all ] && printf '%s ../../../%s\n' "$(basename "$dir")" "$dir"
+    [ "$(skill_reach "$REPO_ROOT/$dir")" = all ] && printf '%s\n' "$dir"
   done < <(head_skill_dirs)
   return 0
 }
 
-# One "<name> <link target>" line per entry in $LINK_DIR/ now, sorted. An
-# entry that is not a symlink is listed with the target "(not a link)".
+# One "<name> <link target>" line per reach `all` skill, sorted by name
+# (comm needs that): the links $LINK_DIR/ should hold. Targets are relative
+# to $LINK_DIR/.
+expected_links() {
+  local dir
+  while IFS= read -r dir; do
+    printf '%s ../../../%s\n' "$(basename "$dir")" "$dir"
+  done < <(all_skill_dirs) | LC_ALL=C sort
+}
+
+# One "<name> <link target>" line per entry git would publish directly in
+# $LINK_DIR/, sorted. An entry that is not a symlink is listed with the
+# target "(not a link)".
 actual_links() {
-  local entry
-  [ -d "$REPO_ROOT/$LINK_DIR" ] || return 0
-  for entry in "$REPO_ROOT/$LINK_DIR"/* "$REPO_ROOT/$LINK_DIR"/.[!.]*; do
-    [ -e "$entry" ] || [ -L "$entry" ] || continue
-    if [ -L "$entry" ]; then
-      printf '%s %s\n' "$(basename "$entry")" "$(readlink "$entry")"
+  local path name
+  published_files "$LINK_DIR" | while IFS= read -r path; do
+    name="${path#"$LINK_DIR"/}"
+    name="${name%%/*}"
+    if [ -L "$REPO_ROOT/$LINK_DIR/$name" ]; then
+      printf '%s %s\n' "$name" "$(readlink "$REPO_ROOT/$LINK_DIR/$name")"
     else
-      printf '%s (not a link)\n' "$(basename "$entry")"
+      printf '%s (not a link)\n' "$name"
     fi
-  done | sort
+  done | LC_ALL=C sort -u
+}
+
+# The names that more than one reach `all` skill uses, one per line.
+duplicate_names() {
+  all_skill_dirs | sed 's|.*/||' | LC_ALL=C sort | uniq -d
 }
 
 write_links() {
-  local name target
-  rm -rf "${REPO_ROOT:?}/$LINK_DIR"
+  local entry name target dups
+  dups="$(duplicate_names)"
+  if [ -n "$dups" ]; then
+    printf '%s: not writing links, since more than one skill with reach all is named: %s\n' \
+      "$PROG" "$(printf '%s' "$dups" | tr '\n' ' ')" >&2
+    return 1
+  fi
   mkdir -p "$REPO_ROOT/$LINK_DIR"
+  for entry in "$REPO_ROOT/$LINK_DIR"/* "$REPO_ROOT/$LINK_DIR"/.[!.]* "$REPO_ROOT/$LINK_DIR"/..?*; do
+    [ -e "$entry" ] || [ -L "$entry" ] || continue
+    [ -L "$entry" ] && continue
+    # An ignored file such as .DS_Store is never published, so it can stay.
+    git -C "$REPO_ROOT" check-ignore -q "$entry" && continue
+    printf '%s: not writing links, since %s is not a symlink; move it out of the plugin first\n' \
+      "$PROG" "${entry#"$REPO_ROOT"/}" >&2
+    return 1
+  done
+  for entry in "$REPO_ROOT/$LINK_DIR"/* "$REPO_ROOT/$LINK_DIR"/.[!.]* "$REPO_ROOT/$LINK_DIR"/..?*; do
+    [ -L "$entry" ] && rm "$entry"
+  done
   while read -r name target; do
     ln -s "$target" "$REPO_ROOT/$LINK_DIR/$name"
   done < <(expected_links)
+}
+
+check_duplicate_names() {
+  local name
+  while IFS= read -r name; do
+    [ -n "$name" ] && printf 'more than one skill with reach all is named %s; claude.ai can publish only one\n' "$name"
+  done < <(duplicate_names)
+  return 0
 }
 
 check_links() {
@@ -139,52 +222,111 @@ check_links() {
   expected="$(expected_links)"
   while read -r name target; do
     [ -n "$name" ] && printf '%s/%s should link to %s, since its reach is all (run bin/%s --write)\n' "$LINK_DIR" "$name" "$target" "$PROG"
-  done < <(comm -13 <(printf '%s\n' "$actual") <(printf '%s\n' "$expected"))
+  done < <(LC_ALL=C comm -13 <(printf '%s\n' "$actual") <(printf '%s\n' "$expected"))
   while read -r name target; do
     [ -n "$name" ] && printf '%s/%s -> %s is not a link to a skill with reach all (run bin/%s --write)\n' "$LINK_DIR" "$name" "$target" "$PROG"
-  done < <(comm -23 <(printf '%s\n' "$actual") <(printf '%s\n' "$expected"))
+  done < <(LC_ALL=C comm -23 <(printf '%s\n' "$actual") <(printf '%s\n' "$expected"))
   return 0
 }
 
 # claude.ai reads every SKILL.md in a plugin's folder and refuses a plugin
 # with a top-level bin/, so the folder holds only the manifest and the links.
 check_plugin_folder() {
-  local entry
-  [ -d "$REPO_ROOT/$PLUGIN_DIR" ] || { printf '%s is missing\n' "$PLUGIN_DIR"; return 0; }
+  local path
   [ -f "$REPO_ROOT/$PLUGIN_JSON" ] || printf '%s is missing\n' "$PLUGIN_JSON"
-  for entry in "$REPO_ROOT/$PLUGIN_DIR"/* "$REPO_ROOT/$PLUGIN_DIR"/.[!.]*; do
-    [ -e "$entry" ] || [ -L "$entry" ] || continue
-    case "$(basename "$entry")" in
-      .claude-plugin|skills) ;;
-      *) printf '%s/%s: the Account plugin may hold only .claude-plugin/ and skills/\n' "$PLUGIN_DIR" "$(basename "$entry")" ;;
+  while IFS= read -r path; do
+    case "$path" in
+      "$PLUGIN_JSON") ;;
+      "$LINK_DIR"/*/*) printf '%s: the Account plugin may hold only %s and links in %s/\n' "$path" "$PLUGIN_JSON" "$LINK_DIR" ;;
+      "$LINK_DIR"/*) ;;
+      *) printf '%s: the Account plugin may hold only %s and links in %s/\n' "$path" "$PLUGIN_JSON" "$LINK_DIR" ;;
     esac
-  done
+  done < <(published_files "$PLUGIN_DIR")
   return 0
+}
+
+# claude.ai follows the links and publishes everything below them, so a
+# linked skill folder must not lead anywhere else: no symlink inside it,
+# and no other skill or plugin nested in it.
+check_linked_skill_folders() {
+  local dir path
+  while IFS= read -r dir; do
+    while IFS= read -r path; do
+      if [ -L "$REPO_ROOT/$path" ]; then
+        printf '%s: a symlink inside a skill with reach all would publish what it points to\n' "$path"
+        continue
+      fi
+      case "$path" in
+        "$dir/SKILL.md") ;;
+        */SKILL.md) printf '%s: claude.ai would publish this nested skill with %s\n' "$path" "$(basename "$dir")" ;;
+        */.claude-plugin/*) printf '%s: a plugin nested in a skill with reach all makes claude.ai skip the Account plugin\n' "$path" ;;
+      esac
+    done < <(published_files "$dir")
+  done < <(all_skill_dirs)
+  return 0
+}
+
+check_manifests() {
+  ruby -EUTF-8 -rjson -e '
+    plugin_json, marketplace_json, name, dir = ARGV
+    def load(path)
+      return [nil, "#{path} is missing"] unless File.file?(path)
+      [JSON.parse(File.read(path)), nil]
+    rescue JSON::ParserError => e
+      [nil, "#{path} is not valid JSON: #{e.message.lines.first.strip}"]
+    end
+    plugin, err = load(plugin_json)
+    if err
+      puts err unless err.end_with?("is missing")
+    elsif !plugin.is_a?(Hash)
+      puts "#{plugin_json} must be a JSON object"
+    else
+      puts "#{plugin_json}: name is #{plugin["name"].inspect}; it must be #{name.inspect}" unless plugin["name"] == name
+      puts "#{plugin_json} sets a version, so commits on main would stop reaching the accounts; remove it" if plugin.key?("version")
+    end
+    market, err = load(marketplace_json)
+    if err
+      puts err
+    elsif !market.is_a?(Hash) || !market["plugins"].is_a?(Array)
+      puts "#{marketplace_json} must be an object with a plugins list"
+    else
+      entries = market["plugins"].select { |p| p.is_a?(Hash) && p["name"] == name }
+      if entries.length != 1
+        puts "#{marketplace_json} must list the #{name} plugin exactly once"
+      else
+        entry = entries.first
+        puts "#{marketplace_json}: the #{name} source is #{entry["source"].inspect}; it must be \"./#{dir}\"" unless entry["source"] == "./#{dir}"
+        puts "#{marketplace_json} sets a version for #{name}, so commits on main would stop reaching the accounts; remove it" if entry.key?("version")
+      end
+    end' "$REPO_ROOT/$PLUGIN_JSON" "$REPO_ROOT/$MARKETPLACE_JSON" "$PLUGIN_NAME" "$PLUGIN_DIR" |
+    sed "s|$REPO_ROOT/||g"
 }
 
 check_single_manifest() {
-  local found
-  while IFS= read -r found; do
-    printf '%s: the Account plugin must be the only plugin in this repository\n' "$found"
-  done < <(cd "$REPO_ROOT" && find . -path ./.git -prune -o -path "*/.claude-plugin/plugin.json" -print |
-             sed 's|^\./||' | grep -vxF "$PLUGIN_JSON" | sort)
+  local path
+  while IFS= read -r path; do
+    case "$path" in
+      "$PLUGIN_JSON") ;;
+      */.claude-plugin/plugin.json|.claude-plugin/plugin.json)
+        printf '%s: the Account plugin must be the only plugin in this repository\n' "$path" ;;
+    esac
+  done < <(published_files .)
   return 0
 }
 
-# Print the names of the skills that changed since the merge base and are
-# or were reach `all`, one per line. The working tree counts, untracked
-# files included, so a local run before committing sees what CI will see
-# after.
-changed_all_skills() {
-  local mb dir before_reach after_reach tmp
-  mb="$(git -C "$REPO_ROOT" merge-base "$BASE" HEAD)"
+# Print one line per thing the plugin publishes that changed since the
+# given merge base: the name of each skill that is or was reach `all`, and
+# the plugin folder or marketplace when they changed. The working tree
+# counts, untracked files included, so a local run before committing sees
+# what CI will see after.
+changed_published() {
+  local mb="$1" dir before_reach after_reach tmp path
   tmp="$(mktemp)"
   {
     head_skill_dirs
     git -C "$REPO_ROOT" ls-tree -r --name-only "$mb" -- skills | sed -n 's|/SKILL\.md$||p'
   } | sort -u | while IFS= read -r dir; do
-    if git -C "$REPO_ROOT" diff --quiet "$mb" -- "$dir" &&
-       [ -z "$(git -C "$REPO_ROOT" ls-files --others --exclude-standard -- "$dir")" ]; then
+    if ! changed_since "$mb" "$dir"; then
       continue
     fi
     if git -C "$REPO_ROOT" cat-file -e "$mb:$dir/SKILL.md" 2>/dev/null; then
@@ -199,10 +341,21 @@ changed_all_skills() {
       after_reach=none
     fi
     if [ "$after_reach" = all ] || [ "$before_reach" = all ]; then
-      basename "$dir"
+      printf -- '- the skill `%s`\n' "$(basename "$dir")"
     fi
   done | sort -u
   rm -f "$tmp"
+  for path in "$PLUGIN_DIR" "$MARKETPLACE_JSON"; do
+    changed_since "$mb" "$path" && printf -- '- `%s`\n' "$path"
+  done
+  return 0
+}
+
+# True when the given path differs from the merge base, counting the
+# working tree and untracked files that are not ignored.
+changed_since() {
+  ! git -C "$REPO_ROOT" diff --quiet "$1" -- "$2" ||
+    [ -n "$(git -C "$REPO_ROOT" ls-files --others --exclude-standard -- "$2")" ]
 }
 
 # Print one line per problem with the given skill directory (relative to
@@ -212,7 +365,7 @@ changed_all_skills() {
 # `code` skills may use any key Claude Code understands, since they never
 # reach claude.ai.
 check_skill() {
-  local dir="$1" file="$REPO_ROOT/$1/SKILL.md" fm reach name desc key
+  local dir="$1" file="$REPO_ROOT/$1/SKILL.md" fm reach
   fm="$(skill_frontmatter "$file")"
   if [ -z "$fm" ]; then
     printf '%s: no front matter\n' "$dir"
@@ -222,6 +375,7 @@ check_skill() {
   local yaml_error; yaml_error="$(skill_frontmatter_yaml_error "$file")"
   if [ -n "$yaml_error" ]; then
     printf '%s: front matter is not valid YAML: %s\n' "$dir" "$yaml_error"
+    return
   fi
 
   if printf '%s\n' "$fm" | grep -qE '^metadata:[[:space:]]*[^[:space:]#]'; then
@@ -233,33 +387,38 @@ check_skill() {
     *) printf '%s: metadata.reach is "%s"; it must be all or code\n' "$dir" "$reach" ;;
   esac
 
-  name="$(printf '%s\n' "$fm" | sed -n 's/^name:[[:space:]]*//p' | head -1 | sed 's/^["'\'']//; s/["'\'']$//')"
-  if [ "$name" != "$(basename "$dir")" ]; then
-    printf '%s: name "%s" does not match the directory name\n' "$dir" "$name"
-  fi
-
-  [ "$reach" = all ] || return 0
-
-  while IFS= read -r key; do
-    case " $ACCOUNT_FRONTMATTER_KEYS " in
-      *" $key "*) ;;
-      *) printf '%s: claude.ai rejects the front matter key "%s" (allowed: %s)\n' \
-           "$dir" "$key" "$ACCOUNT_FRONTMATTER_KEYS" ;;
-    esac
-  done < <(printf '%s\n' "$fm" | sed -n 's/^\([A-Za-z0-9_-]*\):.*/\1/p')
-
-  if ! printf '%s' "$name" | grep -qE '^[a-z0-9-]{1,64}$'; then
-    printf '%s: name must be 1-64 lowercase letters, digits and hyphens\n' "$dir"
-  fi
-  desc="$(printf '%s\n' "$fm" | sed -n 's/^description:[[:space:]]*//p' | head -1 | sed 's/^["'\'']//; s/["'\'']$//')"
-  if [ -z "$desc" ]; then
-    printf '%s: no description\n' "$dir"
-  elif [ "${#desc}" -gt 1024 ]; then
-    printf '%s: description is %d characters; claude.ai allows 1024\n' "$dir" "${#desc}"
-  fi
+  # Read the front matter the way claude.ai does, with a YAML parser, so
+  # quoted keys, folded descriptions and the like are seen as they are.
+  skill_frontmatter "$file" | ruby -EUTF-8 -ryaml -e '
+    dir, reach, allowed = ARGV
+    begin
+      fm = YAML.safe_load($stdin.read) || {}
+    rescue StandardError => e
+      puts "#{dir}: front matter could not be read: #{e.message}"
+      exit
+    end
+    unless fm.is_a?(Hash)
+      puts "#{dir}: front matter must be a map of keys"
+      exit
+    end
+    name = fm["name"].to_s
+    puts "#{dir}: name \"#{name}\" does not match the directory name" unless name == File.basename(dir)
+    exit unless reach == "all"
+    allowed = allowed.split
+    (fm.keys.map(&:to_s) - allowed).each do |key|
+      puts "#{dir}: claude.ai rejects the front matter key \"#{key}\" (allowed: #{allowed.join(" ")})"
+    end
+    puts "#{dir}: name must be 1-64 lowercase letters, digits and hyphens" unless name.match?(/\A[a-z0-9-]{1,64}\z/)
+    desc = fm["description"]
+    if !desc.is_a?(String) || desc.strip.empty?
+      puts "#{dir}: no description"
+    else
+      puts "#{dir}: description is #{desc.length} characters; claude.ai allows 1024" if desc.length > 1024
+      puts "#{dir}: description contains < or >, which claude.ai strips as XML tags" if desc.match?(/[<>]/)
+    end' "$dir" "$reach" "$ACCOUNT_FRONTMATTER_KEYS"
 }
 
-# Print the Markdown summary for the given problems and changed skills.
+# Print the Markdown summary for the given problems and changes.
 summary() {
   local problems="$1" changed="$2"
   if [ -n "$problems" ]; then
@@ -269,12 +428,12 @@ summary() {
   fi
   [ -n "$BASE" ] || return 0
   if [ -z "$changed" ]; then
-    printf 'No skill with reach `all` changed, so the Claude accounts need nothing.\n'
+    printf 'Nothing the Account plugin publishes changed, so the Claude accounts need nothing.\n'
     return
   fi
   printf '### After merging\n\n'
-  printf 'These skills with reach `all` changed:\n\n'
-  printf '%s\n' "$changed" | sed 's/.*/- `&`/'
+  printf 'What the Account plugin publishes changed:\n\n'
+  printf '%s\n' "$changed"
   printf '\nIn each Claude account, open Customize > Plugins, then the `jake-mode` marketplace, and click **Check for updates**.\n'
 }
 
