@@ -19,13 +19,15 @@ Step 9).
 ## Step 1: Try Todoist First
 
 Whenever Jake asks to add something to his to-do list or Todoist inbox, attempt to
-use the Todoist MCP connector immediately.
+reach Todoist immediately. There are two routes: the Todoist MCP connector when
+the session has one, and otherwise the `td` CLI when the session has a shell
+with `td` installed.
 
 If the call **succeeds**: confirm the task was added and move on.
 
-If the call **fails** (permission error, connector unavailable, etc.): do not
-assume the cause. Acknowledge the failure and explain that it's either because
-we're in conversation mode (where the Todoist MCP is unavailable) or because
+If **neither route works** (permission error, no connector and no `td`, etc.): do
+not assume the cause. Acknowledge the failure and explain that it's either because
+we're in conversation mode (where neither route is available) or because
 there's a problem with the Todoist connection itself. Ask Jake to confirm which.
 
 - If **conversation mode** is confirmed: pivot to the running list (see Step 2).
@@ -167,7 +169,7 @@ been built up, remind Jake:
 > "We've got [N] items on the running list. Want me to add them to your Todoist
 > inbox now that we're out of conversation mode?"
 
-If Jake confirms, add them all to Todoist using the Todoist connector, applying
+If Jake confirms, add them all to Todoist by whichever route Step 1 found, applying
 the task titles and descriptions from the running list. Do not re-ask about
 metadata.
 
@@ -190,6 +192,12 @@ field holds the repeat pattern, or `false`.
   same pattern. If it doesn't, tell Jake immediately and offer to restore it.
 - **To change the repeat pattern itself**: only when Jake asks. Then
   `update-tasks` with the new recurring `dueString` is correct.
+
+Those are the connector's tool names. Through the `td` CLI the same rules hold:
+`td task reschedule` moves a date and keeps the repeat, and `td task complete`
+completes. `td task update --due` sends a due string just as `update-tasks`
+does, so never use it on a recurring task, and never pass `--forever` to
+`td task complete` unless Jake asks to stop the repeat.
 
 ---
 
@@ -221,7 +229,7 @@ changeset.
 | Situation | Action |
 |---|---|
 | Asked to add a task, Todoist works | Add directly, confirm |
-| Asked to add a task, Todoist fails | Ask Jake to confirm: conversation mode or connection issue? |
+| Asked to add a task, connector and `td` both fail | Ask Jake to confirm: conversation mode or connection issue? |
 | Task title is vague | Ask one clarifying question before adding |
 | Next action is uncertain | Steer toward research/discovery task; include relevant link |
 | Jake asked a question | Answer it. No capture offer this turn. |
@@ -231,8 +239,8 @@ changeset.
 | Close call | Stay quiet |
 | Metadata (due date, priority, etc.) | Never add unless Jake suggests it |
 | Conversation winding down + running list exists | Remind Jake and offer to add items to Todoist |
-| Move a task's date | `reschedule-tasks`, never `update-tasks` + `dueString` on a recurring task |
-| Complete a task | `complete-tasks` |
+| Move a task's date | `reschedule-tasks` (CLI: `td task reschedule`), never `update-tasks` + `dueString` (CLI: `td task update --due`) on a recurring task |
+| Complete a task | `complete-tasks` (CLI: `td task complete`) |
 | After moving or completing a recurring task | Re-fetch, confirm it still recurs, flag it if not |
 | Processing the inbox | Record each decision in the changeset; Todoist stays read-only |
 | End of inbox, or Jake says done | Show the whole changeset, apply it in one batch once he confirms |

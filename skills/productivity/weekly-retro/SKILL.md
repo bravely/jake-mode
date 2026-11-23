@@ -43,24 +43,25 @@ So:
 - Keep pulling. After they explain, ask what is underneath it. Stay with it until a structural issue surfaces, something about how they approach things rather than what happened this week.
 - When the user says something will sound weird, or hedges, or trails off, slow down further. That is usually where the real thing is.
 - Do not tidy answers into summaries mid-thread. A summary signals the thread is closed. Only reflect back when it helps the user see the shape of what they said, and then ask whether it is right.
-- Watch for repetition across retros. The same feeling or failure mode showing up in more than one week is a signal it is structural, not situational. Check the retro log in memory for this.
+- Watch for repetition across retros. The same feeling or failure mode showing up in more than one week is a signal it is structural, not situational. Check the saved retro notes for this, and the retro log in memory.
 - Do not hurry toward the one change. The one change comes out of the threads; it is not the goal the threads are in service of. Let the user say when a thread is done.
 
 ---
 
 ## Before you begin
 
-Find last week's one change. Check, in this order:
+Find the most recent retro and its one change. Look in every place this session can reach, then take the retro with the latest date. A hit in one place does not end the search: memory and past conversations only know the retros run where they live, so either can hold an old retro and report it as the last one.
 
-1. Memory, where the most recent retro's one change should be recorded.
-2. Past conversations, searching for the previous retro session.
-3. If the user has the vault open, the previous dated retro note.
+1. The vault, when this session can read it (see "Saving the note"): the dated notes in `Retros/` and in `zzz_agents_allowed/Retros/`.
+2. Todoist, through the connector or the `td` CLI: tasks titled "Move the weekly retro note for YYYY-MM-DD into the Obsidian vault", open or completed. The note is the task's description. Search completed tasks back at least two months, because a completed-task search that starts from today finds nothing.
+3. Memory, where a retro's one change may be recorded.
+4. Past conversations, searching for earlier retro sessions.
 
 If none of those turn up a prior change, say so plainly and skip question 1. Do not invent one or guess from context.
 
-Do not pull Todoist or calendar data at the start. This session runs on the user's recollection, not on system state. Pulling data turns it into a review, which is the failure mode this session exists to avoid. If a specific fact is genuinely needed to answer a question, pull just that.
+Apart from that one search for a saved note, do not pull Todoist or calendar data at the start. This session runs on the user's recollection, not on system state. Pulling data turns it into a review, which is the failure mode this session exists to avoid. If a specific fact is genuinely needed to answer a question, pull just that.
 
-Open with something like: "Retro time. Last week's one change was [X]. How did that go?" If there is no prior change, open with question 2 instead and say why.
+Open by naming the date of the retro the change came from, so the user can tell when a later one is missing: "Retro time. The last retro I can find is from [date], and its one change was [X]. How did that go?" If the user says there has been one since, ask what its one change was and use that. If there is no prior change, open with question 2 instead and say why.
 
 ---
 
@@ -110,7 +111,7 @@ If the chosen change needs a task, or a setting altered, or something built, not
 
 ## Writing the note
 
-Produce a dated note the user can save into their Obsidian vault. If vault access is available, offer to write it directly. If not, output it in the conversation so it can be copied later. The conversation does not depend on the vault, only the persistence does.
+Produce a dated note, show it in the conversation, then save it as "Saving the note" below describes. The conversation does not depend on the vault, only the persistence does.
 
 The note is edited prose, not a transcript. Do not reproduce the back and forth. Write it so that someone reading it cold understands what the week was like and why this particular change was chosen. Aim for something a person reads in two minutes.
 
@@ -139,7 +140,19 @@ rephrasing, projects that came up as stalled or no longer wanted. Bullets are
 fine here. This section exists to make the next session faster.
 ```
 
-After writing, record the one change and any structural issues surfaced in memory so the next retro can find them without depending on the vault.
+### Saving the note
+
+The note is saved every time. One left only in the conversation is one the next retro cannot find. Where it goes depends on what this session can reach.
+
+**The vault is available** when this session can write files in it. On the user's Mac the vault is `~/Main`, whatever folder the session started in. Write the note to `zzz_agents_allowed/Retros/YYYY-MM-DD Retro.md`, dated the day of the session, creating the folder if it is missing. Do not ask first, and say where it went. The vault's own rules make `Retros/` read-only to agents, so the user moves the note there when they want it there. Never write, move or edit anything in `Retros/`.
+
+**The vault is not available** (chat, mobile, a cloud session): offer to create a Todoist task that carries the note, through the connector or, where the session has a shell, the `td` CLI. Its title is "Move the weekly retro note for YYYY-MM-DD into the Obsidian vault" and its description is the whole note, as written. Show the title and create the task once the user says yes. Keep the title's wording exact, because the next retro searches for it.
+
+If the user turns the task down, or Todoist cannot be reached either, say plainly that the note exists only in this conversation.
+
+When the user changes the note after it is saved, save the change to the same place: rewrite the file, or update the task's description.
+
+After saving, also record the one change and any structural issues surfaced in memory. That copy is a shortcut for the next retro run in the same place. The saved note is the record.
 
 ---
 
@@ -150,7 +163,7 @@ The weekly review had become pure list mechanics, so thoughts about why a week w
 So:
 
 - Do not turn insights into a pile of Todoist tasks. The one change is the commitment. Everything else goes in the "For the review" section as a note, not as a task.
-- Do not add tasks during this session unless the user explicitly asks. If something clearly needs capturing, say so and let them decide.
+- Do not add tasks during this session unless the user explicitly asks. If something clearly needs capturing, say so and let them decide. The task that carries the note (see "Saving the note") is the one task this session offers unasked.
 - Do not go through lists, projects, or the inbox. That is the weekly review's job, on a different day.
 - Do not propose a second change, even a small one, even when the user seems willing.
 - Do not interpret the user's feelings for them.
