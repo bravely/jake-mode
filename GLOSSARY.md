@@ -43,5 +43,12 @@ The default Todoist project, where captured tasks wait to be processed.
 _Avoid_: Inbox, on its own
 
 **Stream**:
-The unit email triage decides about: all the mail from one sender address, or, when that sender sends several kinds of mail, one of those kinds. One decision covers the whole stream.
-_Avoid_: Subtype, category (a category is a broad grouping that cuts across senders)
+The unit email triage decides about: the mail one sender sends to one recipient (me directly, or a group I'm in), narrowed to one kind of mail when that sender sends several kinds. Each stream gets two decisions, one for its backlog and one for its future mail.
+_Avoid_: Subtype
+
+**Backlog**:
+A stream's mail already sitting in the Gmail inbox. Its decision is to archive it, leave it, or mark it as spam, separately from what happens to the stream's future mail.
+
+**Category**:
+Related streams presented together so they can share one decision, such as every account-security notice. Each stream in it still gets its own filter.
+_Avoid_: Bucket, type
