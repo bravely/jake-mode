@@ -176,7 +176,8 @@ not own.
 | Path | Holds |
 |:-----|:------|
 | `skills/principles/` | The shared vocabulary of reasoning that other skills cite |
-| `skills/planning/` | The multi-phase plan skeleton and its playbooks |
+| `skills/planning/` | The `/jake-mode` router, its playbooks, and the design reference they read |
+| `skills/engineering/` | Engineering skills vendored from `mattpocock/skills`: grilling, domain modeling, codebase design, TDD |
 | `skills/verification/` | Proving a claim, driving a real app, generating per-project verify skills |
 | `skills/delivery/` | Stacked execution, and the pull-request lifecycle (review guides, addressing review) |
 | `skills/hygiene/` | Cleanup passes |
