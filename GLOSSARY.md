@@ -23,3 +23,25 @@ _Avoid_: Plugin skill (dotfiles' term for a skill someone else wrote that arrive
 **Wiring**:
 Making a skill or rule visible to Claude Code by linking it from where it lives into the harness's own directories.
 _Avoid_: Installing (that is what happens to a plugin)
+
+## Inboxes
+
+**Work account**:
+My Solace Gmail account.
+_Avoid_: Work email, Solace inbox
+
+**Personal account**:
+My own-domain Gmail account, kept apart from the work account.
+_Avoid_: Home email, personal inbox
+
+**Gmail inbox**:
+The mail sitting in the `INBOX` label of one of my Gmail accounts, waiting for a decision. Email triage works through it.
+_Avoid_: Inbox, on its own
+
+**Todoist Inbox**:
+The default Todoist project, where captured tasks wait to be processed.
+_Avoid_: Inbox, on its own
+
+**Stream**:
+The unit email triage decides about: all the mail from one sender address, or, when that sender sends several kinds of mail, one of those kinds. One decision covers the whole stream.
+_Avoid_: Subtype, category (a category is a broad grouping that cuts across senders)
