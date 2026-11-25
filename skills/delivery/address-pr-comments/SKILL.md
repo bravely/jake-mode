@@ -12,9 +12,11 @@ thread; resolving is the reviewer's, and stays theirs.
 
 **Two hard rules.**
 
-- **Every reply is from you, the agent.** Open each with the signature
-  `🤖 (agent reply on the author's behalf)` so the reviewer knows a coding agent
-  answered. Never write in the first person as if you were the PR author.
+- **Bot threads get a signed reply; human threads get a draft.** A reply to a
+  bot reviewer opens with `🤖 (agent reply on the author's behalf)`. A reply to a
+  person is a draft the user approves and posts in their own voice, with no
+  signature or footer (the `code-review-replies` rule). Never post as the PR
+  author without the user's approval of the exact text.
 - **A reviewer who asks for a human gets one.** If they request the author, ask
   for a person, escalate, or say they would rather talk to someone than an agent:
   stop, surface that thread to the user immediately, and leave it to them.
@@ -43,7 +45,9 @@ scripts/unresolved-threads.sh [PR_NUMBER]
 ```
 
 The path is relative to this skill's directory (the base directory the harness
-reports when the skill loads). Omit `PR_NUMBER` to use the current branch's PR.
+reports when the skill loads). Run it by its full path from the PR's repository
+checkout, not after `cd`-ing into the skill directory: `gh` reads the repo from
+the current directory. Omit `PR_NUMBER` to use the current branch's PR.
 Each thread comes with `path`, `line`, `thread_id`, `reply_to` (the comment id
 to reply to), the comment bodies, and two triage flags: `last_comment_by` and
 `awaiting_reviewer`. Also skim `gh pr view --json reviews` for top-level
@@ -134,7 +138,8 @@ A reply to a human reviewer is a draft until the user says yes to its exact
 text (the `code-review-replies` rule). Replies to bot reviewers go straight out.
 
 For every thread in your reply set, post a reply to its first comment's
-`reply_to` id, opening with the signature:
+`reply_to` id (bot threads open with the signature; human threads post the
+approved text as written):
 
 ```
 gh api --method POST /repos/{owner}/{repo}/pulls/{PR}/comments/{reply_to}/replies \
